@@ -1,7 +1,7 @@
 {
   "id": "auto-remove",
   "name": "Auto Remove",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "minAppVersion": "1.6.6",
   "description": "Automatically expire notes and files using a time-to-live, then trash or move them after a preview.",
   "author": "Mohammadreza Bahinkor",

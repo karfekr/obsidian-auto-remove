@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MILLISECONDS_PER_DAY } from "../domain/types";
-import { describeOrigin, formatAge, formatTtl, pluralize } from "./format";
+import { MILLISECONDS_PER_DAY } from "../../src/domain/types";
+import { describeOrigin, formatAge, formatTtl, pluralize } from "../../src/ui/format";
 
 describe("formatAge", () => {
   it("describes anything under a day as today", () => {

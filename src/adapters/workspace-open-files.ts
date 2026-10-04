@@ -62,16 +62,32 @@ export class WorkspaceOpenFileTracker implements OpenFileTracker, FileWatcher {
     return this.onVaultEvent(this.app.vault.on("delete", (file) => listener(file.path)));
   }
 
-  /** Releases the workspace subscriptions taken out in the constructor. */
+  /**
+   * Releases every subscription this tracker took out, whoever asked for it.
+   *
+   * The tracker owns its subscriptions rather than relying on every caller to
+   * release its own: a vault listener handed out and then leaked would keep the
+   * whole service graph reachable after the plugin had unloaded. `onRenamed` and
+   * `onDeleted` still return their own unsubscribe for a caller that wants to
+   * detach early, and `dispose` releases whatever is left.
+   */
   dispose(): void {
     this.notify.cancel();
-    for (const ref of this.eventRefs) this.app.workspace.offref(ref);
+    for (const ref of this.eventRefs) {
+      this.app.workspace.offref(ref);
+      this.app.vault.offref(ref);
+    }
     this.eventRefs.length = 0;
     this.listeners.clear();
   }
 
   private onVaultEvent(ref: EventRef): () => void {
-    return () => this.app.vault.offref(ref);
+    this.eventRefs.push(ref);
+    return () => {
+      const index = this.eventRefs.indexOf(ref);
+      if (index !== -1) this.eventRefs.splice(index, 1);
+      this.app.vault.offref(ref);
+    };
   }
 }
 

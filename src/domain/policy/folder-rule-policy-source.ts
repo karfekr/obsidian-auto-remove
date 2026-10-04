@@ -1,5 +1,6 @@
 import { createIgnoreMatcher } from "../ignore-matcher";
 import type { IgnoreMatcher } from "../ignore-matcher";
+import { MARKDOWN_EXTENSION } from "../types";
 import { depth, isInsideFolder, relativeToFolder } from "../vault-path";
 import type { FileSnapshot, FolderRule, RemovalAction } from "../types";
 import { ABSTAIN, EXEMPT, expire } from "./policy-source";
@@ -35,7 +36,11 @@ interface CompiledRule extends FolderRuleBinding {
  * rather than falling through to a shallower rule — otherwise an outer rule
  * would quietly reclaim everything an inner rule had just excluded.
  *
- * Unlike frontmatter, this source is happy to claim non-Markdown files.
+ * A rule's `scope` narrows it in the same way `enabled` does: a file the rule is
+ * not configured to cover is simply not its business, so evaluation continues
+ * and a shallower rule may still claim it. `md` — the default — covers only
+ * Markdown files. `all` opts attachments in, which is safe only because
+ * `domain/validation.ts` refuses a destination that the rule itself covers.
  */
 export class FolderRulePolicySource implements PolicySource {
   readonly id = "folder-rule";
@@ -53,6 +58,7 @@ export class FolderRulePolicySource implements PolicySource {
   resolve(file: FileSnapshot): PolicyVerdict {
     for (const compiled of this.rules) {
       if (!isInsideFolder(file.path, compiled.rule.folder)) continue;
+      if (!covers(compiled.rule, file)) continue;
 
       const relativePath = relativeToFolder(file.path, compiled.rule.folder);
       if (relativePath === null || compiled.matcher.ignores(relativePath)) return EXEMPT;
@@ -69,4 +75,9 @@ export class FolderRulePolicySource implements PolicySource {
     }
     return ABSTAIN;
   }
+}
+
+/** Whether a rule's configured scope includes this kind of file. */
+function covers(rule: { scope: FolderRule["scope"] }, file: FileSnapshot): boolean {
+  return rule.scope === "all" || file.extension === MARKDOWN_EXTENSION;
 }

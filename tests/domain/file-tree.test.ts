@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildTree, collapseSingleChildFolders, collectFilePaths } from "./file-tree";
-import type { FolderNode } from "./file-tree";
-import type { ExpiredFile } from "./types";
+import {
+  buildTree,
+  collapseSingleChildFolders,
+  collectFilePaths,
+} from "../../src/domain/file-tree";
+import type { FolderNode } from "../../src/domain/file-tree";
+import type { ExpiredFile } from "../../src/domain/types";
 
 function expired(path: string): ExpiredFile {
   return {

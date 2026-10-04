@@ -6,8 +6,15 @@ import type { AutoRemoveSettings, FolderRule } from "../domain/types";
  */
 export const DEFAULT_TTL_DAYS = 7;
 
-/** Bumped whenever the persisted shape changes; drives migrations on load. */
-export const CURRENT_SCHEMA_VERSION = 1;
+/**
+ * Bumped whenever the persisted shape changes.
+ *
+ * There is no migration to run: `parseSettings` reads the fields it understands
+ * and ignores everything else, so an older `data.json` loads fine and a newer one
+ * loses only the fields it cannot interpret. Version 2 replaced the removed
+ * `triggers` setting with `debugLogging` and added a per-rule `scope`.
+ */
+export const CURRENT_SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: AutoRemoveSettings = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -15,7 +22,7 @@ export const DEFAULT_SETTINGS: AutoRemoveSettings = {
   defaultAction: "trash",
   defaultMoveDestination: "",
   folderRules: [],
-  triggers: ["startup"],
+  debugLogging: false,
 };
 
 /** A blank folder rule for the settings UI to hand to the user. */
@@ -27,6 +34,9 @@ export function createFolderRule(): FolderRule {
     ttlDays: DEFAULT_TTL_DAYS,
     action: "trash",
     moveDestination: "",
+    // Markdown only. Opting attachments in is a deliberate choice, and the
+    // default must not make it on the user's behalf.
+    scope: "md",
     ignorePatterns: [],
   };
 }

@@ -30,6 +30,7 @@ export class FolderRuleEditor {
 
     this.renderHeader(card, rule);
     this.renderTtl(card, rule);
+    this.renderScope(card, rule);
     this.renderAction(card, rule);
     if (rule.action === "move") this.renderDestination(card, rule);
     this.renderIgnorePatterns(card, rule);
@@ -77,6 +78,28 @@ export class FolderRuleEditor {
         text.inputEl.type = "number";
         text.inputEl.min = "0";
       });
+  }
+
+  /**
+   * Which files the rule may claim.
+   *
+   * Markdown only by default, and the wording says why: attachments carry no
+   * frontmatter, so nothing stops them being expired again from their new home.
+   */
+  private renderScope(card: HTMLElement, rule: FolderRule): void {
+    new Setting(card)
+      .setName("Applies to")
+      .setDesc(
+        rule.scope === "md"
+          ? "Markdown notes only."
+          : "Markdown notes and attachments. Attachments carry no properties, so one moved into a folder this rule covers would be filed again on the next run.",
+      )
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOptions({ md: "Notes only", all: "Notes and attachments" })
+          .setValue(rule.scope)
+          .onChange((value) => this.options.onChange({ scope: value === "all" ? "all" : "md" })),
+      );
   }
 
   private renderAction(card: HTMLElement, rule: FolderRule): void {

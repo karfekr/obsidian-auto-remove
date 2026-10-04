@@ -1,4 +1,4 @@
-import { MILLISECONDS_PER_DAY } from "./types";
+import { MAX_TTL_DAYS, MILLISECONDS_PER_DAY } from "./types";
 import type { ExpirationPolicy, ExpiredFile, FileSnapshot } from "./types";
 
 /**
@@ -42,12 +42,15 @@ export function toExpiredFile(
  * Parses a `ttl` frontmatter value.
  *
  * Accepts numbers and numeric strings, since YAML quoting is easy to get wrong
- * by accident. Rejects anything negative, fractional or unparseable so that a
- * typo falls back to the configured default rather than deleting a file early.
+ * by accident. Rejects anything negative, fractional, unparseable or beyond
+ * {@link MAX_TTL_DAYS} so that a typo falls back to the configured default
+ * rather than deleting a file early — or, at the far end, producing an expiry
+ * so distant that the note silently never expires at all.
  */
 export function parseTtlDays(value: unknown): number | null {
   const parsed = coerceToNumber(value);
-  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  if (!Number.isInteger(parsed)) return null;
+  if (parsed < 0 || parsed > MAX_TTL_DAYS) return null;
   return parsed;
 }
 

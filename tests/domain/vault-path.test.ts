@@ -10,7 +10,7 @@ import {
   relativeToFolder,
   splitExtension,
   VAULT_ROOT,
-} from "./vault-path";
+} from "../../src/domain/vault-path";
 
 describe("normalizeFolder", () => {
   it("strips leading, trailing and duplicated slashes", () => {

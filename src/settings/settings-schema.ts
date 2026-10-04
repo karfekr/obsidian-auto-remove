@@ -1,5 +1,7 @@
+import { MAX_TTL_DAYS } from "../domain/types";
+import type { AutoRemoveSettings, FolderRule } from "../domain/types";
 import { normalizeFolder } from "../domain/vault-path";
-import type { AutoRemoveSettings, FolderRule, RemovalActionKind, TriggerId } from "../domain/types";
+import { validateFolderRule } from "../domain/validation";
 import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, DEFAULT_TTL_DAYS } from "./defaults";
 
 /**
@@ -7,9 +9,14 @@ import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, DEFAULT_TTL_DAYS } from "./de
  * trust.
  *
  * The file is plain JSON on disk: users edit it, sync clients merge it, and an
- * older version of the plugin may have written it. Validating once here means
- * no downstream code has to defend against a `ttlDays` of `"soon"`, and a
- * corrupt field costs the user one default rather than a broken plugin.
+ * older version of the plugin may have written it. Validating once here means no
+ * downstream code has to defend against a `ttlDays` of `"soon"`, and a corrupt
+ * field costs the user one default rather than a broken plugin.
+ *
+ * Note what this deliberately does *not* do: repair. A malformed TTL becomes the
+ * documented default, because a typo there would otherwise delete files early. A
+ * `move` with no destination is preserved exactly as written and reported by
+ * `domain/validation.ts` — it is never turned into a different action.
  */
 export function parseSettings(raw: unknown): AutoRemoveSettings {
   const source = isRecord(raw) ? raw : {};
@@ -20,31 +27,18 @@ export function parseSettings(raw: unknown): AutoRemoveSettings {
     defaultAction: parseActionKind(source["defaultAction"]),
     defaultMoveDestination: parseFolderPath(source["defaultMoveDestination"]),
     folderRules: parseFolderRules(source["folderRules"]),
-    triggers: parseTriggers(source["triggers"]),
+    debugLogging: source["debugLogging"] === true,
   };
 }
 
-/** Human-readable reason a rule cannot run, or `null` when it is usable. */
-export function describeRuleProblem(rule: FolderRule): string | null {
-  if (rule.action === "move" && normalizeFolder(rule.moveDestination).length === 0) {
-    return "Choose a destination folder, or switch this rule to Trash.";
-  }
-  if (rule.action === "move" && wouldMoveIntoItself(rule)) {
-    return "The destination folder is inside the rule folder, so files would expire again.";
-  }
-  return null;
-}
-
 /**
- * A destination nested inside the rule's own folder would re-expire everything
- * it receives, deleting files on the next run after appearing to archive them.
+ * Human-readable reason a rule cannot run, or `null` when it is usable.
+ *
+ * A thin wrapper over the domain validator so the settings page and the resolver
+ * can never disagree about which rules are live.
  */
-function wouldMoveIntoItself(rule: FolderRule): boolean {
-  const folder = normalizeFolder(rule.folder);
-  const destination = normalizeFolder(rule.moveDestination);
-  if (destination.length === 0) return false;
-  if (folder.length === 0) return true;
-  return destination === folder || destination.startsWith(`${folder}/`);
+export function describeRuleProblem(rule: FolderRule): string | null {
+  return validateFolderRule(rule)?.message ?? null;
 }
 
 function parseFolderRules(raw: unknown): FolderRule[] {
@@ -60,8 +54,20 @@ function parseFolderRule(raw: Record<string, unknown>, index: number): FolderRul
     ttlDays: parseTtl(raw["ttlDays"], DEFAULT_TTL_DAYS),
     action: parseActionKind(raw["action"]),
     moveDestination: parseFolderPath(raw["moveDestination"]),
+    scope: parseScope(raw["scope"]),
     ignorePatterns: parsePatterns(raw["ignorePatterns"]),
   };
+}
+
+/**
+ * Anything other than an explicit `"all"` means Markdown only.
+ *
+ * The asymmetry is deliberate. A rule written by an older version, or by hand,
+ * has no `scope` field at all, and the safe reading of "this rule does not say
+ * what it covers" is "Markdown only".
+ */
+function parseScope(raw: unknown): FolderRule["scope"] {
+  return raw === "all" ? "all" : "md";
 }
 
 /** Accepts patterns as an array or as the newline-separated text the UI edits. */
@@ -80,23 +86,17 @@ export function splitPatternLines(text: string): string[] {
 
 function parseTtl(raw: unknown, fallback: number): number {
   const value = typeof raw === "number" ? raw : Number(raw);
-  if (!Number.isInteger(value) || value < 0) return fallback;
+  if (!Number.isInteger(value)) return fallback;
+  if (value < 0 || value > MAX_TTL_DAYS) return fallback;
   return value;
 }
 
-function parseActionKind(raw: unknown): RemovalActionKind {
+function parseActionKind(raw: unknown): AutoRemoveSettings["defaultAction"] {
   return raw === "move" ? "move" : "trash";
 }
 
 function parseFolderPath(raw: unknown): string {
   return typeof raw === "string" ? normalizeFolder(raw) : "";
-}
-
-const KNOWN_TRIGGERS: readonly TriggerId[] = ["startup"];
-
-function parseTriggers(raw: unknown): TriggerId[] {
-  if (!Array.isArray(raw)) return [...DEFAULT_SETTINGS.triggers];
-  return KNOWN_TRIGGERS.filter((trigger) => raw.includes(trigger));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

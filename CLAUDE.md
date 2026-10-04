@@ -14,16 +14,16 @@ anything structural.
 
 ```bash
 pnpm run dev          # esbuild watch → main.js (what you leave running while developing)
-pnpm run build        # tsc --noEmit --skipLibCheck, then a minified production bundle
+pnpm run build        # clean → build:style → esbuild production bundle → tsc
 pnpm test             # vitest run
 pnpm run test:watch   # vitest in watch mode
-pnpm run lint         # eslint, including eslint-plugin-obsidianmd
+pnpm run lint         # eslint (--fix) && prettier --write
 ```
 
 Run a single test file or a single case:
 
 ```bash
-pnpx vitest run src/domain/policy/policy.test.ts
+pnpx vitest run tests/domain/validation.test.ts
 pnpx vitest run -t "lets an explicit opt-out veto the folder rule covering it"
 ```
 
@@ -36,47 +36,94 @@ to releases, never committed.
 
 ## The one invariant that matters
 
-`src/domain`, `src/services` and `src/settings` **must not import from `obsidian`.**
+`src/domain`, `src/services`, `src/settings` and `src/infrastructure` **must not import from
+`obsidian`.**
 
 This is what makes the logic testable: there is no way to construct a `TFile` outside a running
 vault, so anything that touches the Obsidian API is untestable by definition. The boundary is
-enforced twice — a `no-restricted-imports` rule in `eslint.config.mjs`, and
-`src/architecture.test.ts`, which reads the source files and fails if an import slips through. If
-you find yourself wanting an Obsidian type in those directories, add a port to
+enforced three ways — a `no-restricted-imports` rule in `eslint.config.mjs`,
+`tests/architecture.test.ts`, which reads the source files and fails if an import slips through, and
+the fact that the suite runs in a Node environment with no DOM.
+
+If you find yourself wanting an Obsidian type in those directories, add a port to
 `src/services/ports.ts` instead and implement it in `src/adapters`.
 
 Layering, each depending only inward:
 
 ```
-ui/  triggers/  adapters/     ← the only code that imports `obsidian`
-            ↓
-        services/              ← workflows, over four ports
-            ↓
-  domain/         settings/    ← rules, types, configuration
+    ui/   triggers/   adapters/    ← the only code that imports `obsidian`
+                       app/         ← the composition root, and only this
+              ↓
+          services/                 ← orchestration, over ports
+              ↓
+  domain/       infrastructure/     ← rules, decisions, clock, logging
+              ↓
+           settings/                ← persistence and validation
 ```
 
-`src/main.ts` is a composition root and nothing else — it wires by hand, with no DI container, no
-event bus and no generic repository.
+`src/app/runtime.ts` is the composition root and nothing else. `src/main.ts` is a shell that hands
+it Obsidian's `App` and gets back a wired object graph. There is no DI container, no event bus and
+no generic repository.
+
+## The design in one idea
+
+Rules are **state**, not deadlines:
+
+```text
+file state + current time + rules = desired action
+```
+
+A rule is a comparison — `now >= mtime + TTL`. Nothing records a moment at which a file _should_
+have been removed, so there is no schedule to miss, no "last run" to catch up on, and no class of
+scheduler-recovery bug. A timer only decides how long the plugin takes to _notice_ a file that is
+already eligible.
+
+`ReconciliationService` (`src/services/reconciliation-service.ts`) is the single authoritative path,
+fed by startup, a five-minute interval, debounced vault events and the Run now command. Triggers
+decide _when_; the service decides _what_. **Never add business logic to a trigger or a command.**
 
 ## Non-obvious design points
 
-**A policy source returns one of three verdicts, not "policy or null."** `PolicyVerdict` is `expire`
-/ `exempt` / `abstain` (`src/domain/policy/policy-source.ts`). Collapsing `exempt` and `abstain`
-into `null` is the natural simplification and it is wrong: a note marked `auto-remove: false` would
-abstain and then be claimed by whatever folder rule it sits under, defeating the only mechanism for
-exempting a single note from a folder rule. Conversely a stray `ttl:` with no `auto-remove`
-genuinely _does_ abstain — the value is ignored but the note never refused, so a folder rule may
-still claim it on the folder's terms. Both cases are pinned by tests in
-`src/domain/policy/policy.test.ts`; do not "simplify" them away.
+**An unusable rule claims nothing, and says so.** `src/domain/validation.ts` is the single authority
+on whether a rule can be carried out; the resolver and the settings page both consult it. A `move`
+with no destination is invalid — it is never reinterpreted, and in particular **never turned into a
+delete**. A destination inside the rule's own folder is also invalid, because only Markdown files
+carry the frontmatter that is stripped after a move; an attachment would be re-filed indefinitely.
 
-**Priority order lives in one array.** `createPolicyResolver`
+**`FileRule.scope` is `"md"` by default.** Anything other than an explicit `"all"` reads as
+Markdown-only, so a rule written by hand or by an older version gets the safe reading. Attachments
+are opt-in because they have nothing to strip.
+
+**A policy source has three verdicts, not two.** `expire` / `exempt` / `abstain`
+(`src/domain/policy/policy-source.ts`). Collapsing `exempt` and `abstain` is natural and wrong: a
+note marked `auto-remove: false` would then be claimed by whatever folder rule it sits under. Note
+that `PolicyResolver.resolve` _does_ collapse them, deliberately — deciding needs one answer. When
+you need to tell them apart (for diagnostics), ask `resolver.sources` directly, as
+`ExpirationScanner` does.
+
+**Priority order lives in one array.** `buildPolicyResolver`
 (`src/domain/policy/resolver-factory.ts`) builds the ordered `PolicySource[]`. That order _is_ the
 spec: frontmatter, then folder rules. Ignore patterns are evaluated inside `FolderRulePolicySource`,
-which is why an explicit `auto-remove: true` beats a folder's ignore patterns.
+which is why an explicit `auto-remove: true` beats a folder's ignores.
 
-**The resolver is rebuilt per cleanup run from a settings snapshot.** Ignore matchers compile once,
-at construction. There is deliberately no cache to invalidate — a run sees one consistent
-configuration and edits take effect on the next run.
+**The resolver is rebuilt per run from a settings snapshot.** Ignore matchers compile once, at
+construction. There is deliberately no cache to invalidate — a run sees one consistent configuration
+and edits take effect on the next run.
+
+**Time and timers are injected, not read.** `Clock` is a function; `systemClock` is the only place
+`Date.now` appears. `ManualClock` and `ManualScheduler` are how the suite tests
+23-hour/24-hour/25-hour boundaries and the debounce window in microseconds. Do not add fake timers
+to business logic.
+
+**Evaluate produces decisions, not removals.** `ExpirationScanner.evaluate` returns a `FileDecision`
+for every file a rule had an opinion about, **including the ones left alone and why**.
+`domain/plan.ts`'s `buildPlan` turns the eligible subset into `PlannedRemoval`s, and only the
+executor touches the filesystem. The preview dialog, the dry run and the "explain this file" command
+all read the same plan, which is why they cannot disagree.
+
+**Three outcomes, never two.** `ActionExecutor` reports removed, warned and failed separately. A
+`move` that succeeded but could not rewrite the note's frontmatter is a _warning_: reporting it as a
+failure was the audit's clearest bug, and retrying would rename the file twice.
 
 **Pending actions store paths, not decisions** (`src/services/pending-actions.ts`). When a file
 leaves the open set it is re-scanned against the current clock. "Edit to cancel, close to confirm"
@@ -84,8 +131,26 @@ falls out of that single re-check; do not add separate edit tracking. The queue 
 so nothing survives a reload.
 
 **Preview is a `PreviewGate` function** the cleanup service awaits, not a hard-wired step. Returning
-`null` cancels. Keeping it a parameter is what makes "nothing is removed without confirmation" a
-property of one signature.
+`null` cancels. Automatic runs ask once per distinct set of files (`OncePerPlanPromptPolicy`) so a
+five-minute interval does not re-raise the same dialog; a manual run always asks.
+
+## Test doubles must match production
+
+`FakeVault` and the real `VaultFileActions` are held together by `tests/adapters/agreement.test.ts`,
+which runs the same scenarios through both and requires them to agree. This exists because they once
+did not — the fake did not strip frontmatter, so service tests passed while production was broken.
+If you change one, that test will tell you about the other.
+
+`tests/support/obsidian-mock.ts` stands in for the `obsidian` module. Use it with:
+
+```ts
+vi.mock("obsidian", async () => await import("../support/obsidian-mock"));
+```
+
+It models the awkward semantics on purpose: the Vault API returning `null` inside hidden folders,
+`createFolder` throwing when a folder exists, `renameFile` mutating the `TFile` in place,
+`processFrontMatter` throwing on malformed YAML, and `onLayoutReady` firing immediately when the
+layout is already ready.
 
 ## Obsidian API constraints
 
@@ -97,47 +162,46 @@ is silent rather than loud.
   bumping it and adding a `versions.json` entry.
 - **Never read `leaf.view.file` to find open files.** Since Obsidian 1.7.2 a background tab holds a
   `DeferredView`, so the view object is absent for exactly the tabs that matter. Use
-  `leaf.getViewState().state.file` (see `src/adapters/workspace-open-files.ts`) and do not call
-  `loadIfDeferred()`, which undoes Obsidian's optimisation.
+  `leaf.getViewState().state.file` (see `src/adapters/workspace-open-files.ts`).
 - **Deletion always goes through `FileManager.trashFile`**, which honours the user's own "Deleted
   files" preference. The plugin must never implement its own trash.
 - **Moves use `FileManager.renameFile`**, not `Vault.rename`, so inbound links are updated per user
   preference. `renameFile` mutates the `TFile` in place, so the same reference stays valid
   afterwards.
+- **`processFrontMatter` _adds_ a frontmatter block to a file that has none.** That is why
+  `releaseFromAutoRemove` checks the metadata cache first and does nothing when there is nothing of
+  ours to remove — otherwise every archived plain note would gain `---\n---`.
 - **Frontmatter is read from `MetadataCache`, never by parsing files.** A full scan therefore does
   zero disk I/O, which is what keeps startup scans imperceptible.
-- **Frontmatter edits go through `FileManager.processFrontMatter`**, which throws on malformed YAML
-  — that is caught and reported, and never rolls back an already-successful move.
 
 ## Deliberate deviations
 
 `src/ui/settings-tab.ts` uses the imperative `display()` API rather than the declarative
 `getSettingDefinitions()` added in Obsidian 1.13.0. The declarative API binds one control to one
 settings key and cannot express a user-editable list of folder rules; adopting it would also raise
-`minAppVersion` to 1.13.0. The relevant lint rules are disabled for that one file in
-`eslint.config.mjs`, with the reason recorded there. `eslint-plugin-obsidianmd` forbids inline
-`eslint-disable` for these, so config-scoped overrides are the only route.
+`minAppVersion` to 1.13.0. `eslint.config.mjs` disables the relevant rules for `logging.ts` and
+`dry-run-report.ts` (which log on purpose) and for test files, with the reason recorded there.
+`eslint-plugin-obsidianmd` forbids inline `eslint-disable` for these, so config-scoped overrides are
+the only route.
 
 ## Where to add things
 
-| To add                               | Touch                                                                                                                     |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| A new way to claim (or exempt) files | One `PolicySource` in `src/domain/policy/`, one entry in `resolver-factory.ts`                                            |
-| A new automatic trigger              | One `CleanupTrigger` in `src/triggers/`, one entry in `main.ts`, a new id in `TriggerId`                                  |
-| A new action                         | The `RemovalAction` union, `removal-action.ts`, `executeAction` in `pending-actions.ts`, `adapters/vault-file-actions.ts` |
-| A new setting                        | `domain/types.ts`, `settings/defaults.ts`, `settings/settings-schema.ts`, `ui/settings-tab.ts`                            |
-| Preview appearance                   | `ui/preview-modal.ts`, `ui/tree-view.ts` — the tree's _shape_ is `domain/file-tree.ts`                                    |
-
-Settings arriving from `data.json` are user-editable, sync-merged and possibly written by an older
-version, so everything is validated once in `settings/settings-schema.ts`. Add validation there
-rather than defending downstream.
+| To add                               | Touch                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| A new way to claim (or exempt) files | One `PolicySource` in `src/domain/policy/`, one entry in `resolver-factory.ts`                         |
+| A new automatic trigger              | One `CleanupTrigger` in `src/triggers/`, one line in `src/app/runtime.ts`                              |
+| A new action                         | The `RemovalAction` union, `removal-action.ts`, `action-executor.ts`, `adapters/vault-file-actions.ts` |
+| A new setting                        | `domain/types.ts`, `settings/defaults.ts`, `settings/settings-schema.ts`, `ui/settings-tab.ts`         |
+| A new _kind of decision_             | `domain/plan.ts` and the `describe*` functions beside it — nothing else needs to change                |
+| Preview or report appearance         | `ui/preview-modal.ts`, `ui/dry-run-report.ts`, `ui/tree-view.ts`; the shape is `domain/plan.ts`        |
 
 ## Conventions
 
-- Tests sit beside their subject as `*.test.ts`; esbuild only follows imports from `src/main.ts`, so
-  they are never bundled.
+- Tests live in `tests/`, mirroring the production layout in `src/`, and never inside `src/` itself.
+  esbuild only follows imports from `src/main.ts`, so they cannot be bundled at all — the production
+  bundle is byte-identical whether the suite is present or not.
 - Source files are kept under roughly 200 lines. Split by responsibility when one grows past that.
-- UI strings use sentence case (Obsidian's convention, lint-enforced). Only failures go to
-  `console.error` — no routine logging.
-- Styling uses Obsidian CSS variables in `styles.css` so the plugin follows the user's theme; no
+- UI strings use sentence case (Obsidian's convention, lint-enforced). Only failures, warnings and
+  opt-in diagnostics go to the console.
+- Styling uses Obsidian CSS variables in `src/styles/` so the plugin follows the user's theme; no
   hardcoded colours or inline styles.

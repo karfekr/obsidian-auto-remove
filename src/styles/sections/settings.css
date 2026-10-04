@@ -27,3 +27,39 @@
 .auto-remove-rule__error.is-visible {
   display: block;
 }
+
+/*
+ * Configuration that is not running.
+ *
+ * Deliberately louder than the inline per-rule error: this describes the state of
+ * the whole plugin rather than one card, and the consequence — those rules are
+ * doing nothing — is the thing a user needs to be certain about.
+ */
+.auto-remove-banner {
+  display: none;
+  margin-bottom: var(--size-4-4);
+  padding: var(--size-4-3);
+  border: 1px solid var(--text-error);
+  border-radius: var(--radius-m);
+  background-color: var(--background-modifier-error);
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+}
+
+.auto-remove-banner.is-visible {
+  display: block;
+}
+
+.auto-remove-banner p {
+  margin: 0 0 var(--size-2-2);
+}
+
+.auto-remove-banner p:last-child {
+  margin-bottom: 0;
+  color: var(--text-muted);
+}
+
+.auto-remove-banner ul {
+  margin: 0 0 var(--size-2-2);
+  padding-inline-start: var(--size-4-4);
+}

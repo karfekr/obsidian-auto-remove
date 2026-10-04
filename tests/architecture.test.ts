@@ -11,8 +11,8 @@ import { describe, expect, it } from "vitest";
  * asserted here rather than left to discipline.
  */
 
-const SOURCE_ROOT = join(__dirname);
-const OBSIDIAN_FREE_LAYERS = ["domain", "services", "settings"];
+const SOURCE_ROOT = join(__dirname, "..", "src");
+const OBSIDIAN_FREE_LAYERS = ["domain", "services", "settings", "infrastructure"];
 
 function sourceFilesIn(directory: string): string[] {
   const found: string[] = [];

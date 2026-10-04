@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createIgnoreMatcher, isMeaningfulPattern, validateIgnorePattern } from "./ignore-matcher";
+import {
+  createIgnoreMatcher,
+  isMeaningfulPattern,
+  validateIgnorePattern,
+} from "../../src/domain/ignore-matcher";
 
 describe("createIgnoreMatcher", () => {
   it("ignores nothing when there are no patterns", () => {

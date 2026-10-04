@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { FolderRulePolicySource } from "./folder-rule-policy-source";
-import { FrontmatterPolicySource, readOptIn } from "./frontmatter-policy-source";
-import { PolicyResolver } from "./policy-resolver";
-import type { PolicySource } from "./policy-source";
-import type { ExpirationPolicy, FileSnapshot, FolderRule, RemovalAction } from "../types";
+import { FolderRulePolicySource } from "../../../src/domain/policy/folder-rule-policy-source";
+import {
+  FrontmatterPolicySource,
+  readOptIn,
+} from "../../../src/domain/policy/frontmatter-policy-source";
+import { PolicyResolver } from "../../../src/domain/policy/policy-resolver";
+import type { PolicySource } from "../../../src/domain/policy/policy-source";
+import type {
+  ExpirationPolicy,
+  FileSnapshot,
+  FolderRule,
+  RemovalAction,
+} from "../../../src/domain/types";
 
 /** The policy a source settled on, or `null` for abstain and exempt alike. */
 function policyOf(source: PolicySource, file: FileSnapshot): ExpirationPolicy | null {
@@ -34,6 +42,7 @@ function rule(overrides: Partial<FolderRule> & Pick<FolderRule, "folder">): Fold
     ttlDays: 30,
     action: "trash",
     moveDestination: "",
+    scope: "md",
     ignorePatterns: [],
     ...overrides,
   };
@@ -84,6 +93,19 @@ describe("FrontmatterPolicySource", () => {
     expect(verdictOf(source, attachment("board.canvas", "canvas"))).toBe("abstain");
   });
 
+  it("abstains on frontmatter carried by a file that cannot have any", () => {
+    // The adapter never reports frontmatter for a non-Markdown file, so this is
+    // belt and braces — but the domain refuses to act on the inconsistency
+    // rather than trusting a snapshot that says otherwise.
+    const impossible = {
+      path: "note.png",
+      extension: "png",
+      mtime: 0,
+      frontmatter: { "auto-remove": true },
+    };
+    expect(verdictOf(source, impossible)).toBe("abstain");
+  });
+
   it("abstains on a value that states neither yes nor no", () => {
     expect(verdictOf(source, markdown("note.md", { "auto-remove": "maybe" }))).toBe("abstain");
     expect(verdictOf(source, markdown("note.md", { "auto-remove": 1 }))).toBe("abstain");
@@ -128,9 +150,57 @@ describe("FolderRulePolicySource", () => {
     expect(policyOf(source, markdown("Projects/note.md"))).toBeNull();
   });
 
-  it("claims non-Markdown files too", () => {
-    const source = folderRules([rule({ folder: "Inbox" })]);
-    expect(policyOf(source, attachment("Inbox/scan.pdf", "pdf"))).not.toBeNull();
+  describe("file scope", () => {
+    // `scope` defaults to `md`. The previous behaviour — claiming attachments —
+    // is only reachable by asking for it explicitly, because only Markdown files
+    // carry the frontmatter a move strips, so an attachment moved into a folder
+    // its own rule covers would be renamed again on every later run.
+    it("claims a Markdown file under the default scope", () => {
+      const source = folderRules([rule({ folder: "Inbox" })]);
+      expect(policyOf(source, markdown("Inbox/note.md"))).not.toBeNull();
+    });
+
+    it("does not claim an attachment under the default scope", () => {
+      const source = folderRules([rule({ folder: "Inbox" })]);
+      expect(verdictOf(source, attachment("Inbox/scan.pdf", "pdf"))).toBe("abstain");
+    });
+
+    it("claims an attachment when the rule opts into every file", () => {
+      const source = folderRules([rule({ folder: "Inbox", scope: "all" })]);
+      expect(policyOf(source, attachment("Inbox/scan.pdf", "pdf"))).not.toBeNull();
+    });
+
+    it("still claims Markdown files when the rule opts into every file", () => {
+      const source = folderRules([rule({ folder: "Inbox", scope: "all" })]);
+      expect(policyOf(source, markdown("Inbox/note.md"))).not.toBeNull();
+    });
+
+    it("lets a shallower rule claim an attachment the deeper rule does not cover", () => {
+      // Scope narrows a rule in the same way `enabled` does: it makes the file
+      // none of that rule's business, rather than vetoing it for everyone.
+      const source = folderRules([
+        rule({ folder: "Inbox", scope: "all" }),
+        rule({ folder: "Inbox/drafts", scope: "md" }),
+      ]);
+
+      expect(policyOf(source, attachment("Inbox/drafts/scan.pdf", "pdf"))?.origin).toEqual({
+        source: "folder-rule",
+        ruleId: "rule-Inbox",
+        folder: "Inbox",
+      });
+    });
+
+    it("matches a .canvas only when the rule covers every file", () => {
+      expect(
+        verdictOf(folderRules([rule({ folder: "Inbox" })]), attachment("Inbox/b.canvas", "canvas")),
+      ).toBe("abstain");
+      expect(
+        verdictOf(
+          folderRules([rule({ folder: "Inbox", scope: "all" })]),
+          attachment("Inbox/b.canvas", "canvas"),
+        ),
+      ).toBe("expire");
+    });
   });
 
   it("applies a root rule to the whole vault", () => {

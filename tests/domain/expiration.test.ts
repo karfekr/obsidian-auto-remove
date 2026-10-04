@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { expiresAt, isExpired, parseTtlDays, toExpiredFile } from "./expiration";
-import { MILLISECONDS_PER_DAY } from "./types";
-import type { ExpirationPolicy, FileSnapshot } from "./types";
+import { expiresAt, isExpired, parseTtlDays, toExpiredFile } from "../../src/domain/expiration";
+import { MILLISECONDS_PER_DAY } from "../../src/domain/types";
+import type { ExpirationPolicy, FileSnapshot } from "../../src/domain/types";
 
 const NOW = Date.UTC(2026, 0, 15);
 

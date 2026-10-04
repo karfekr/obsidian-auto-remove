@@ -1,6 +1,6 @@
 {
   "name": "obsidian-auto-remove",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Automatically expire files in your Obsidian vault using a configurable time-to-live.",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "clean": "node scripts/clean.mjs",
     "build": "pnpm run clean && pnpm run build:style && node esbuild.config.mjs production && tsc -noEmit -skipLibCheck",
     "build:style": "node scripts/build-styles.mjs",
-    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "version": "node scripts/sync-version.mjs && git add manifest.json versions.json",
     "prepare": "simple-git-hooks"
   },
   "dependencies": {

@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { toRemovalAction } from "../domain/removal-action";
-import { DEFAULT_SETTINGS, DEFAULT_TTL_DAYS } from "./defaults";
-import { describeRuleProblem, parseSettings, splitPatternLines } from "./settings-schema";
-import type { FolderRule } from "../domain/types";
+import { toRemovalAction } from "../../src/domain/removal-action";
+import { DEFAULT_SETTINGS, DEFAULT_TTL_DAYS } from "../../src/settings/defaults";
+import {
+  describeRuleProblem,
+  parseSettings,
+  splitPatternLines,
+} from "../../src/settings/settings-schema";
+import type { FolderRule } from "../../src/domain/types";
 
 function rule(overrides: Partial<FolderRule> = {}): FolderRule {
   return {
@@ -12,6 +16,7 @@ function rule(overrides: Partial<FolderRule> = {}): FolderRule {
     ttlDays: 7,
     action: "trash",
     moveDestination: "",
+    scope: "md",
     ignorePatterns: [],
     ...overrides,
   };
@@ -30,12 +35,13 @@ describe("parseSettings", () => {
       defaultTtlDays: 21,
       defaultAction: "move",
       defaultMoveDestination: "/Archive/",
-      triggers: ["startup"],
+      debugLogging: true,
     });
 
     expect(parsed.defaultTtlDays).toBe(21);
     expect(parsed.defaultAction).toBe("move");
     expect(parsed.defaultMoveDestination).toBe("Archive");
+    expect(parsed.debugLogging).toBe(true);
   });
 
   it("replaces an unusable TTL with the default rather than expiring early", () => {
@@ -44,13 +50,40 @@ describe("parseSettings", () => {
     expect(parseSettings({ defaultTtlDays: 1.5 }).defaultTtlDays).toBe(DEFAULT_TTL_DAYS);
   });
 
+  it("replaces a TTL beyond the supported range rather than never expiring", () => {
+    // `Number.isInteger(1e21)` is true, so without a ceiling this produced an
+    // expiry no clock would reach: a note that looks configured and never fires.
+    expect(parseSettings({ defaultTtlDays: 1e21 }).defaultTtlDays).toBe(DEFAULT_TTL_DAYS);
+    expect(
+      parseSettings({ folderRules: [{ folder: "Inbox", ttlDays: 1e21 }] }).folderRules[0]?.ttlDays,
+    ).toBe(DEFAULT_TTL_DAYS);
+  });
+
   it("treats an unrecognised action as trash", () => {
     expect(parseSettings({ defaultAction: "incinerate" }).defaultAction).toBe("trash");
   });
 
-  it("discards unknown triggers", () => {
-    expect(parseSettings({ triggers: ["startup", "telepathy"] }).triggers).toEqual(["startup"]);
-    expect(parseSettings({ triggers: [] }).triggers).toEqual([]);
+  it("defaults debug logging off unless explicitly enabled", () => {
+    expect(parseSettings({}).debugLogging).toBe(false);
+    expect(parseSettings({ debugLogging: "yes" }).debugLogging).toBe(false);
+  });
+
+  it("reads the file scope, treating anything but an explicit `all` as markdown", () => {
+    const parsed = parseSettings({
+      folderRules: [
+        { id: "a", folder: "Inbox", scope: "all" },
+        { id: "b", folder: "Logs", scope: "everything" },
+        { id: "c", folder: "Notes" },
+      ],
+    });
+
+    expect(parsed.folderRules.map((entry) => entry.scope)).toEqual(["all", "md", "md"]);
+  });
+
+  it("ignores a leftover trigger list from an older version", () => {
+    // The setting no longer exists: reconciliation is always on. Reading it as
+    // `undefined` keeps an old `data.json` loadable without inventing behaviour.
+    expect(parseSettings({ triggers: ["startup"] })).toEqual(DEFAULT_SETTINGS);
   });
 
   it("normalises folder rules and skips non-object entries", () => {
@@ -70,6 +103,7 @@ describe("parseSettings", () => {
         ttlDays: 3,
         action: "move",
         moveDestination: "Archive",
+        scope: "md",
         ignorePatterns: [],
       },
     ]);

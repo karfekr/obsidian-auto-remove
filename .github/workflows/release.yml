@@ -53,6 +53,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Tests and types gate the release. `build` type-checks, but not the test
+      # suite, and a plugin that deletes files unattended should not ship on the
+      # strength of a green bundler alone.
+      - name: Test
+        run: pnpm test
+
+      - name: Lint
+        run: pnpm exec eslint .
+
       - name: Validate plugin manifest
         run: |
           test -f manifest.json

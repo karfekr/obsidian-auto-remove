@@ -12,7 +12,18 @@ import type { PolicySource } from "./policy-source";
  * never overridden by a lower-priority rule that would have claimed the file.
  */
 export class PolicyResolver {
-  constructor(private readonly sources: readonly PolicySource[]) {}
+  /**
+   * The chain, in priority order.
+   *
+   * Public because diagnostics need it: `resolve` deliberately collapses
+   * "exempt" and "abstain" to the same `null`, so explaining *why* a file was
+   * left alone means asking the sources directly.
+   */
+  readonly sources: readonly PolicySource[];
+
+  constructor(sources: readonly PolicySource[]) {
+    this.sources = sources;
+  }
 
   resolve(file: FileSnapshot): ExpirationPolicy | null {
     for (const source of this.sources) {

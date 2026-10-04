@@ -1,4 +1,5 @@
 import { parseTtlDays } from "../expiration";
+import { MARKDOWN_EXTENSION } from "../types";
 import type { FileSnapshot, RemovalAction } from "../types";
 import { ABSTAIN, EXEMPT, expire } from "./policy-source";
 import type { PolicySource, PolicyVerdict } from "./policy-source";
@@ -47,6 +48,11 @@ export class FrontmatterPolicySource implements PolicySource {
   constructor(private readonly defaults: FrontmatterPolicyDefaults) {}
 
   resolve(file: FileSnapshot): PolicyVerdict {
+    // Only Markdown files carry frontmatter, and the adapter that reads it says
+    // so too. Repeating the check here keeps the domain honest on its own terms:
+    // a snapshot claiming frontmatter on a `.png` is not trusted to act on it.
+    if (file.extension !== MARKDOWN_EXTENSION) return ABSTAIN;
+
     const frontmatter = file.frontmatter;
     if (frontmatter === null) return ABSTAIN;
 

@@ -29,7 +29,12 @@ export default tseslint.config(
   {
     // The domain and service layers must stay free of Obsidian so they remain
     // unit-testable without a vault. See docs/ARCHITECTURE.md.
-    files: ["src/domain/**/*.ts", "src/services/**/*.ts", "src/settings/**/*.ts"],
+    files: [
+      "src/domain/**/*.ts",
+      "src/services/**/*.ts",
+      "src/settings/**/*.ts",
+      "src/infrastructure/**/*.ts",
+    ],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -46,11 +51,32 @@ export default tseslint.config(
     },
   },
   {
-    // Tests run in Node and are never bundled into main.js, so the mobile-safety
-    // rules about Node built-ins do not apply to them.
-    files: ["src/**/*.test.ts", "src/**/test-doubles.ts"],
+    // Tests and their support code live in `tests/`, outside the production tree.
+    // They run in Node and are never bundled into main.js, so the mobile-safety
+    // rules about Node built-ins do not apply to them. `unbound-method` goes with
+    // them: `expect(service.run)` is the standard way to assert on a spy. The mock
+    // of the Obsidian API uses `globalThis` because it is loaded under both Node
+    // and the browser, and `window` does not exist under Node.
+    files: ["tests/**/*.ts"],
     rules: {
       "obsidianmd/no-nodejs-modules": "off",
+      "obsidianmd/hardcoded-config-path": "off",
+      "obsidianmd/no-tfile-tfolder-cast": "off",
+      "obsidianmd/rule-custom-message": "off",
+      "obsidianmd/no-global-this": "off",
+      "@typescript-eslint/no-base-to-string": "off",
+      "@typescript-eslint/unbound-method": "off",
+    },
+  },
+  {
+    // `infrastructure/logging.ts` *is* the console abstraction — the whole point of
+    // the module is to be the one place `console` is touched, so that noise can be
+    // gated in one place. `ui/dry-run-report.ts` logs because a dry run's output is
+    // the deliverable: the user asked what would happen, and the answer is a list of
+    // files and reasons. Both are opt-in, deliberate diagnostics, not debug noise.
+    files: ["src/infrastructure/logging.ts", "src/ui/dry-run-report.ts"],
+    rules: {
+      "obsidianmd/rule-custom-message": "off",
     },
   },
   {

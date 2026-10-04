@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPolicyResolver } from "../domain/policy/resolver-factory";
-import { MILLISECONDS_PER_DAY } from "../domain/types";
-import { DEFAULT_SETTINGS } from "../settings/defaults";
-import { ActionExecutor } from "./action-executor";
-import { CleanupService } from "./cleanup-service";
-import type { PreviewGate } from "./cleanup-service";
-import { ExpirationScanner } from "./expiration-scanner";
-import { PendingActions } from "./pending-actions";
-import { FakeOpenFiles, FakeVault, FakeWatcher } from "./test-doubles";
-import type { AutoRemoveSettings, FolderRule } from "../domain/types";
-import type { ActionFailure } from "./ports";
+import { buildPolicyResolver } from "../../src/domain/policy/resolver-factory";
+import { MILLISECONDS_PER_DAY } from "../../src/domain/types";
+import { DEFAULT_SETTINGS } from "../../src/settings/defaults";
+import { RecordingLogger } from "../support/loggers";
+import { ActionExecutor } from "../../src/services/action-executor";
+import { CleanupService, ForcePromptPolicy } from "../../src/services/cleanup-service";
+import type { PreviewGate } from "../../src/services/cleanup-service";
+import { ExpirationScanner } from "../../src/services/expiration-scanner";
+import { PendingActions } from "../../src/services/pending-actions";
+import { FakeOpenFiles, FakeVault, FakeWatcher } from "../support/test-doubles";
+import type { AutoRemoveSettings, FolderRule } from "../../src/domain/types";
 
 const NOW = Date.UTC(2026, 5, 1);
 const daysAgo = (days: number): number => NOW - days * MILLISECONDS_PER_DAY;
@@ -21,6 +21,7 @@ function rule(overrides: Partial<FolderRule> & Pick<FolderRule, "folder">): Fold
     ttlDays: 30,
     action: "trash",
     moveDestination: "",
+    scope: "md",
     ignorePatterns: [],
     ...overrides,
   };
@@ -35,11 +36,11 @@ function harness(options: {
 }) {
   const openFiles = options.openFiles ?? new FakeOpenFiles();
   const watcher = new FakeWatcher();
-  const failures: ActionFailure[] = [];
+  const logger = new RecordingLogger(true);
   let now = NOW;
 
   let settings: AutoRemoveSettings = { ...DEFAULT_SETTINGS, ...options.settings };
-  const createResolver = () => createPolicyResolver(settings);
+  const createResolver = () => buildPolicyResolver(settings);
 
   const scanner = new ExpirationScanner(options.vault, () => now);
   const pending = new PendingActions({
@@ -47,16 +48,18 @@ function harness(options: {
     actions: options.vault,
     openFiles,
     watcher,
-    createResolver,
-    onFailure: (failure) => failures.push(failure),
+    createResolver: () => ({ resolver: createResolver().resolver }),
+    logger,
   });
-  const executor = new ActionExecutor(options.vault, openFiles, pending);
+  const executor = new ActionExecutor(options.vault, openFiles, pending, logger);
   const service = new CleanupService({
     scanner,
     executor,
     openFiles,
+    logger,
     createResolver,
     preview: options.preview ?? (async (items) => items),
+    promptPolicy: new ForcePromptPolicy(),
   });
 
   return {
@@ -65,8 +68,8 @@ function harness(options: {
     pending,
     openFiles,
     watcher,
-    failures,
-    createResolver,
+    logger,
+    resolver: () => createResolver().resolver,
     setNow: (value: number) => {
       now = value;
     },
@@ -83,12 +86,12 @@ describe("ExpirationScanner", () => {
       { path: "Inbox/fresh.md", mtime: daysAgo(2) },
       { path: "Elsewhere/old.md", mtime: daysAgo(40) },
     ]);
-    const { scanner, createResolver } = harness({
+    const { scanner, resolver } = harness({
       vault,
       settings: { folderRules: [rule({ folder: "Inbox", ttlDays: 30 })] },
     });
 
-    expect(scanner.scan(createResolver()).map((item) => item.file.path)).toEqual(["Inbox/old.md"]);
+    expect(scanner.scan(resolver()).map((item) => item.file.path)).toEqual(["Inbox/old.md"]);
   });
 
   it("returns results in a stable path order", () => {
@@ -97,13 +100,13 @@ describe("ExpirationScanner", () => {
       { path: "a.md", mtime: daysAgo(40) },
       { path: "Sub/c.md", mtime: daysAgo(40) },
     ]);
-    const { scanner, createResolver } = harness({
+    const { scanner, resolver } = harness({
       vault,
       settings: { folderRules: [rule({ folder: "", ttlDays: 1 })] },
     });
 
     // Locale-aware ordering, so casing does not scatter otherwise adjacent paths.
-    expect(scanner.scan(createResolver()).map((item) => item.file.path)).toEqual([
+    expect(scanner.scan(resolver()).map((item) => item.file.path)).toEqual([
       "a.md",
       "b.md",
       "Sub/c.md",
@@ -112,19 +115,19 @@ describe("ExpirationScanner", () => {
 
   it("rescan reports null once a file is edited back within its TTL", () => {
     const vault = new FakeVault([{ path: "note.md", mtime: daysAgo(40) }]);
-    const { scanner, createResolver } = harness({
+    const { scanner, resolver } = harness({
       vault,
       settings: { folderRules: [rule({ folder: "", ttlDays: 30 })] },
     });
 
-    expect(scanner.rescan("note.md", createResolver())).not.toBeNull();
+    expect(scanner.rescan("note.md", resolver())).not.toBeNull();
     vault.touch("note.md", NOW);
-    expect(scanner.rescan("note.md", createResolver())).toBeNull();
+    expect(scanner.rescan("note.md", resolver())).toBeNull();
   });
 
   it("rescan reports null for a file that no longer exists", () => {
-    const { scanner, createResolver } = harness({ vault: new FakeVault() });
-    expect(scanner.rescan("gone.md", createResolver())).toBeNull();
+    const { scanner, resolver } = harness({ vault: new FakeVault() });
+    expect(scanner.rescan("gone.md", resolver())).toBeNull();
   });
 });
 
@@ -143,7 +146,8 @@ describe("CleanupService", () => {
 
   it("reports when nothing has expired", async () => {
     const { service } = harness({ vault: new FakeVault(), settings: inboxRule });
-    expect(await service.run()).toEqual({ status: "nothing-expired" });
+    // `toMatchObject` because an outcome now carries the plan it was derived from.
+    expect(await service.run()).toMatchObject({ status: "nothing-expired" });
   });
 
   it("never acts without going through the preview gate first", async () => {
@@ -153,14 +157,14 @@ describe("CleanupService", () => {
     const outcome = await service.run();
 
     expect(preview).toHaveBeenCalledOnce();
-    expect(outcome).toEqual({ status: "cancelled" });
+    expect(outcome).toMatchObject({ status: "cancelled" });
     expect(vault.trashed).toEqual([]);
     expect(vault.has("Inbox/a.md")).toBe(true);
   });
 
   it("treats an empty selection as a cancellation", async () => {
     const { service } = harness({ vault, settings: inboxRule, preview: async () => [] });
-    expect(await service.run()).toEqual({ status: "cancelled" });
+    expect(await service.run()).toMatchObject({ status: "cancelled" });
     expect(vault.trashed).toEqual([]);
   });
 
@@ -345,13 +349,13 @@ describe("open files", () => {
   it("reports a failure from a queued action instead of retrying it forever", async () => {
     const vault = openVault();
     const openFiles = new FakeOpenFiles(["Inbox/open.md"]);
-    const { service, pending, failures } = harness({ vault, settings: inboxRule, openFiles });
+    const { service, pending, logger } = harness({ vault, settings: inboxRule, openFiles });
     await service.run();
 
     vault.failOn = (path) => path === "Inbox/open.md";
     await openFiles.close("Inbox/open.md");
 
-    expect(failures).toHaveLength(1);
+    expect(logger.messagesMatching("Could not remove")).toHaveLength(1);
     expect(pending.pendingPaths).toEqual([]);
   });
 
