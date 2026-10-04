@@ -11,14 +11,14 @@ const versionsPath = path.join(root, "versions.json");
 const packagePath = path.join(root, "package.json");
 
 function readJson(file) {
-  if (!existsSync(file)) {
-    throw new Error(`✖ Missing file: ${file}`);
-  }
-  return JSON.parse(readFileSync(file, "utf8"));
+	if (!existsSync(file)) {
+		throw new Error(`✖ Missing file: ${file}`);
+	}
+	return JSON.parse(readFileSync(file, "utf8"));
 }
 
 function writeJson(file, data, indent = 2) {
-  writeFileSync(file, JSON.stringify(data, null, indent) + "\n", "utf8");
+	writeFileSync(file, JSON.stringify(data, null, indent) + "\n", "utf8");
 }
 
 // manifest.json
@@ -35,16 +35,16 @@ console.log(`✔ Min app version: ${minAppVersion}`);
 // package.json
 const packageJson = readJson(packagePath);
 if (packageJson.version !== targetVersion) {
-  packageJson.version = targetVersion;
-  writeJson(packagePath, packageJson, 2);
-  console.log("✔ package.json synced");
+	packageJson.version = targetVersion;
+	writeJson(packagePath, packageJson, 2);
+	console.log("✔ package.json synced");
 } else {
-  console.log("✔ package.json already synced");
+	console.log("✔ package.json already synced");
 }
 
 // versions.json
 const newVersions = {
-  [targetVersion]: minAppVersion,
+	[targetVersion]: minAppVersion,
 };
 writeJson(versionsPath, newVersions, "\t");
 console.log("✔ versions.json replaced with latest version");

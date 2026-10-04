@@ -17,7 +17,7 @@ pnpm run dev          # esbuild watch → main.js (what you leave running while 
 pnpm run build        # clean → build:style → esbuild production bundle → tsc
 pnpm test             # vitest run
 pnpm run test:watch   # vitest in watch mode
-pnpm run lint         # eslint (--fix) && prettier --write
+pnpm run lint         # biome check --write (format + lint)
 ```
 
 Run a single test file or a single case:
@@ -41,9 +41,8 @@ to releases, never committed.
 
 This is what makes the logic testable: there is no way to construct a `TFile` outside a running
 vault, so anything that touches the Obsidian API is untestable by definition. The boundary is
-enforced three ways — a `no-restricted-imports` rule in `eslint.config.mjs`,
-`tests/architecture.test.ts`, which reads the source files and fails if an import slips through, and
-the fact that the suite runs in a Node environment with no DOM.
+enforced two ways — `tests/architecture.test.ts`, which reads the source files and fails if an
+import slips through, and the fact that the suite runs in a Node environment with no DOM.
 
 If you find yourself wanting an Obsidian type in those directories, add a port to
 `src/services/ports.ts` instead and implement it in `src/adapters`.
@@ -141,11 +140,20 @@ which runs the same scenarios through both and requires them to agree. This exis
 did not — the fake did not strip frontmatter, so service tests passed while production was broken.
 If you change one, that test will tell you about the other.
 
-`tests/support/obsidian-mock.ts` stands in for the `obsidian` module. Use it with:
+`tests/support/obsidian-mock.ts` stands in for the `obsidian` module, and it is wired up by
+`resolve.alias` in `vitest.config.ts` — **do not add `vi.mock("obsidian", …)` to a test.** The
+`obsidian` package is types-only (`"main": ""`), so the bare specifier has no resolvable entry;
+aliasing fixes resolution itself, whereas `vi.mock` only works if it happens to be applied before
+the resolver runs, which changed between Vitest/Vite versions. Tests get the mock by importing
+`installObsidianMock` normally:
 
 ```ts
-vi.mock("obsidian", async () => await import("../support/obsidian-mock"));
+import { installObsidianMock } from "../support/obsidian-mock";
 ```
+
+Only execution is redirected. `tsconfig.json` has no path mapping, so TypeScript still checks every
+`obsidian` import against the real `obsidian.d.ts`, and `esbuild.config.mjs` still marks `obsidian`
+as `external` so the production bundle is untouched.
 
 It models the awkward semantics on purpose: the Vault API returning `null` inside hidden folders,
 `createFolder` throwing when a folder exists, `renameFile` mutating the `TFile` in place,
@@ -179,10 +187,11 @@ is silent rather than loud.
 `src/ui/settings-tab.ts` uses the imperative `display()` API rather than the declarative
 `getSettingDefinitions()` added in Obsidian 1.13.0. The declarative API binds one control to one
 settings key and cannot express a user-editable list of folder rules; adopting it would also raise
-`minAppVersion` to 1.13.0. `eslint.config.mjs` disables the relevant rules for `logging.ts` and
-`dry-run-report.ts` (which log on purpose) and for test files, with the reason recorded there.
-`eslint-plugin-obsidianmd` forbids inline `eslint-disable` for these, so config-scoped overrides are
-the only route.
+`minAppVersion` to 1.13.0. `biome.json` turns `noConsole` off for `logging.ts` and
+`dry-run-report.ts` only, because the `console.*` calls *are* those two files' output; everywhere else
+in `src/` it stays an error, so a stray `console.log` cannot slip in. A config-scoped `overrides`
+entry is used rather than a `biome-ignore` comment at the call site, to keep the two exemptions
+visible in one place.
 
 ## Where to add things
 

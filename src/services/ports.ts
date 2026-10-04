@@ -1,6 +1,6 @@
-import type { Clock } from "../infrastructure/clock";
 import type { ActionPlan } from "../domain/plan";
 import type { ExpiredFile, FileSnapshot } from "../domain/types";
+import type { Clock } from "../infrastructure/clock";
 
 /**
  * The seams between the cleanup logic and the vault it acts on.
@@ -12,9 +12,9 @@ import type { ExpiredFile, FileSnapshot } from "../domain/types";
 
 /** Reads the vault as a flat list of snapshots. */
 export interface FileRepository {
-  listFiles(): FileSnapshot[];
-  /** Re-reads one file, or returns `null` if it is gone. */
-  getFile(path: string): FileSnapshot | null;
+	listFiles(): FileSnapshot[];
+	/** Re-reads one file, or returns `null` if it is gone. */
+	getFile(path: string): FileSnapshot | null;
 }
 
 /**
@@ -25,38 +25,38 @@ export interface FileRepository {
  * kept its properties has moved, and reporting it as a failure would be a lie.
  */
 export interface FileActions {
-  trash(path: string): Promise<MoveResult>;
-  /**
-   * Moves a file into `destination`, returning its new path. Implementations
-   * resolve name collisions rather than overwriting.
-   */
-  move(path: string, destination: string): Promise<MoveResult>;
+	trash(path: string): Promise<MoveResult>;
+	/**
+	 * Moves a file into `destination`, returning its new path. Implementations
+	 * resolve name collisions rather than overwriting.
+	 */
+	move(path: string, destination: string): Promise<MoveResult>;
 }
 
 export interface MoveResult {
-  readonly path: string;
-  /** The file reached its destination. `false` means nothing happened. */
-  readonly moved: boolean;
-  /**
-   * The file moved, but something afterwards did not work.
-   *
-   * Never treated as a failure of the move itself: rolling a completed move back
-   * would be a second, riskier mutation.
-   */
-  readonly warnings: readonly string[];
+	readonly path: string;
+	/** The file reached its destination. `false` means nothing happened. */
+	readonly moved: boolean;
+	/**
+	 * The file moved, but something afterwards did not work.
+	 *
+	 * Never treated as a failure of the move itself: rolling a completed move back
+	 * would be a second, riskier mutation.
+	 */
+	readonly warnings: readonly string[];
 }
 
 /** Reports which files are open in the workspace and when that changes. */
 export interface OpenFileTracker {
-  getOpenPaths(): ReadonlySet<string>;
-  /** Subscribes to open-set changes; returns a function that unsubscribes. */
-  subscribe(listener: () => void): () => void;
+	getOpenPaths(): ReadonlySet<string>;
+	/** Subscribes to open-set changes; returns a function that unsubscribes. */
+	subscribe(listener: () => void): () => void;
 }
 
 /** Notifies when files move or disappear underneath a queued action. */
 export interface FileWatcher {
-  onRenamed(listener: (fromPath: string, toPath: string) => void): () => void;
-  onDeleted(listener: (path: string) => void): () => void;
+	onRenamed(listener: (fromPath: string, toPath: string) => void): () => void;
+	onDeleted(listener: (path: string) => void): () => void;
 }
 
 export type { Clock };
@@ -70,10 +70,10 @@ export type { Clock };
  * without a real clock, and without fake timers installed globally.
  */
 export interface Scheduler {
-  /** Runs `fn` every `ms`. Returns a function that cancels it. */
-  every(ms: number, fn: () => void): () => void;
-  /** Runs `fn` once, after `ms` of quiet. Returns a function that cancels it. */
-  after(ms: number, fn: () => void): () => void;
+	/** Runs `fn` every `ms`. Returns a function that cancels it. */
+	every(ms: number, fn: () => void): () => void;
+	/** Runs `fn` once, after `ms` of quiet. Returns a function that cancels it. */
+	after(ms: number, fn: () => void): () => void;
 }
 
 /**
@@ -84,9 +84,9 @@ export interface Scheduler {
  * logging would drown the console. `warn` and `error` are always emitted.
  */
 export interface Logger {
-  debug(message: string, context?: LogContext): void;
-  warn(message: string, context?: LogContext): void;
-  error(message: string, context?: LogContext): void;
+	debug(message: string, context?: LogContext): void;
+	warn(message: string, context?: LogContext): void;
+	error(message: string, context?: LogContext): void;
 }
 
 /**
@@ -106,34 +106,34 @@ export type LogContext = Readonly<Record<string, unknown>>;
  * well as on events, so an un-deduplicated prompt would reappear every interval.
  */
 export interface PromptPolicy {
-  /** Whether to show the confirmation dialog for this plan. */
-  shouldPrompt(plan: ActionPlan): boolean;
-  /** Called once the dialog has resolved, whatever the user chose. */
-  settled(plan: ActionPlan): void;
+	/** Whether to show the confirmation dialog for this plan. */
+	shouldPrompt(plan: ActionPlan): boolean;
+	/** Called once the dialog has resolved, whatever the user chose. */
+	settled(plan: ActionPlan): void;
 }
 
 /** The outcome of acting on one expired file. */
 export interface ActionFailure {
-  readonly item: ExpiredFile;
-  readonly error: unknown;
+	readonly item: ExpiredFile;
+	readonly error: unknown;
 }
 
 export interface CleanupResult {
-  /** Files acted on during this run. */
-  readonly removed: readonly ExpiredFile[];
-  /** Files left alone because they are open; queued to run once closed. */
-  readonly deferred: readonly ExpiredFile[];
-  /**
-   * Files that moved but were not finished with.
-   *
-   * Kept apart from {@link failed} because the move itself succeeded; rolling
-   * back would be a second mutation, and re-running would rename the file twice.
-   */
-  readonly warnings: readonly ActionWarning[];
-  readonly failed: readonly ActionFailure[];
+	/** Files acted on during this run. */
+	readonly removed: readonly ExpiredFile[];
+	/** Files left alone because they are open; queued to run once closed. */
+	readonly deferred: readonly ExpiredFile[];
+	/**
+	 * Files that moved but were not finished with.
+	 *
+	 * Kept apart from {@link failed} because the move itself succeeded; rolling
+	 * back would be a second mutation, and re-running would rename the file twice.
+	 */
+	readonly warnings: readonly ActionWarning[];
+	readonly failed: readonly ActionFailure[];
 }
 
 export interface ActionWarning {
-  readonly item: ExpiredFile;
-  readonly message: string;
+	readonly item: ExpiredFile;
+	readonly message: string;
 }

@@ -17,28 +17,28 @@ export const DEFAULT_TTL_DAYS = 7;
 export const CURRENT_SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: AutoRemoveSettings = {
-  schemaVersion: CURRENT_SCHEMA_VERSION,
-  defaultTtlDays: DEFAULT_TTL_DAYS,
-  defaultAction: "trash",
-  defaultMoveDestination: "",
-  folderRules: [],
-  debugLogging: false,
+	schemaVersion: CURRENT_SCHEMA_VERSION,
+	defaultTtlDays: DEFAULT_TTL_DAYS,
+	defaultAction: "trash",
+	defaultMoveDestination: "",
+	folderRules: [],
+	debugLogging: false,
 };
 
 /** A blank folder rule for the settings UI to hand to the user. */
 export function createFolderRule(): FolderRule {
-  return {
-    id: createRuleId(),
-    enabled: true,
-    folder: "",
-    ttlDays: DEFAULT_TTL_DAYS,
-    action: "trash",
-    moveDestination: "",
-    // Markdown only. Opting attachments in is a deliberate choice, and the
-    // default must not make it on the user's behalf.
-    scope: "md",
-    ignorePatterns: [],
-  };
+	return {
+		id: createRuleId(),
+		enabled: true,
+		folder: "",
+		ttlDays: DEFAULT_TTL_DAYS,
+		action: "trash",
+		moveDestination: "",
+		// Markdown only. Opting attachments in is a deliberate choice, and the
+		// default must not make it on the user's behalf.
+		scope: "md",
+		ignorePatterns: [],
+	};
 }
 
 /**
@@ -49,8 +49,8 @@ export function createFolderRule(): FolderRule {
  * while the user is adding a rule.
  */
 function createRuleId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `rule-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+	if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+		return crypto.randomUUID();
+	}
+	return `rule-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }

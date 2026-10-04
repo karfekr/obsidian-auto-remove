@@ -1,24 +1,24 @@
 import { toRemovalAction } from "../removal-action";
 import type { AutoRemoveSettings } from "../types";
-import { validateDefaultAction, validateFolderRule } from "../validation";
 import type { ConfigurationProblem } from "../validation";
-import { FolderRulePolicySource } from "./folder-rule-policy-source";
+import { validateDefaultAction, validateFolderRule } from "../validation";
 import type { FolderRuleBinding } from "./folder-rule-policy-source";
+import { FolderRulePolicySource } from "./folder-rule-policy-source";
 import { FrontmatterPolicySource } from "./frontmatter-policy-source";
 import { PolicyResolver } from "./policy-resolver";
 import type { PolicySource } from "./policy-source";
 
 /** A resolver, plus the configuration that could not be turned into one. */
 export interface BuiltPolicy {
-  readonly resolver: PolicyResolver;
-  /**
-   * Configuration that is currently inert.
-   *
-   * Reported rather than swallowed: a rule that claims nothing because it is
-   * invalid is indistinguishable from a working plugin from the outside, which
-   * is exactly how "the plugin does nothing" reports happen.
-   */
-  readonly problems: readonly ConfigurationProblem[];
+	readonly resolver: PolicyResolver;
+	/**
+	 * Configuration that is currently inert.
+	 *
+	 * Reported rather than swallowed: a rule that claims nothing because it is
+	 * invalid is indistinguishable from a working plugin from the outside, which
+	 * is exactly how "the plugin does nothing" reports happen.
+	 */
+	readonly problems: readonly ConfigurationProblem[];
 }
 
 /**
@@ -37,38 +37,38 @@ export interface BuiltPolicy {
  * quietly turned into a delete.
  */
 export function buildPolicyResolver(settings: AutoRemoveSettings): BuiltPolicy {
-  const problems: ConfigurationProblem[] = [];
-  const sources: PolicySource[] = [];
+	const problems: ConfigurationProblem[] = [];
+	const sources: PolicySource[] = [];
 
-  const defaultProblem = validateDefaultAction(settings);
-  if (defaultProblem === null) {
-    const action = toRemovalAction(settings.defaultAction, settings.defaultMoveDestination);
-    if (action !== null) {
-      sources.push(new FrontmatterPolicySource({ ttlDays: settings.defaultTtlDays, action }));
-    }
-  } else {
-    problems.push({ ...defaultProblem, target: "default-action" });
-  }
+	const defaultProblem = validateDefaultAction(settings);
+	if (defaultProblem === null) {
+		const action = toRemovalAction(settings.defaultAction, settings.defaultMoveDestination);
+		if (action !== null) {
+			sources.push(new FrontmatterPolicySource({ ttlDays: settings.defaultTtlDays, action }));
+		}
+	} else {
+		problems.push({ ...defaultProblem, target: "default-action" });
+	}
 
-  const bindings: FolderRuleBinding[] = [];
-  for (const rule of settings.folderRules) {
-    const problem = validateFolderRule(rule);
-    if (problem !== null) {
-      problems.push({ ...problem, target: `rule:${rule.id}` });
-      continue;
-    }
+	const bindings: FolderRuleBinding[] = [];
+	for (const rule of settings.folderRules) {
+		const problem = validateFolderRule(rule);
+		if (problem !== null) {
+			problems.push({ ...problem, target: `rule:${rule.id}` });
+			continue;
+		}
 
-    const action = toRemovalAction(rule.action, rule.moveDestination);
-    // Unreachable while `validateFolderRule` covers every case `toRemovalAction`
-    // rejects; kept so a future action kind degrades to "claims nothing" rather
-    // than to a binding carrying an impossible action.
-    if (action === null) continue;
-    bindings.push({ rule, action });
-  }
+		const action = toRemovalAction(rule.action, rule.moveDestination);
+		// Unreachable while `validateFolderRule` covers every case `toRemovalAction`
+		// rejects; kept so a future action kind degrades to "claims nothing" rather
+		// than to a binding carrying an impossible action.
+		if (action === null) continue;
+		bindings.push({ rule, action });
+	}
 
-  sources.push(new FolderRulePolicySource(bindings));
+	sources.push(new FolderRulePolicySource(bindings));
 
-  return { resolver: new PolicyResolver(sources), problems };
+	return { resolver: new PolicyResolver(sources), problems };
 }
 
 /**
@@ -79,5 +79,5 @@ export function buildPolicyResolver(settings: AutoRemoveSettings): BuiltPolicy {
  * what is inert.
  */
 export function createPolicyResolver(settings: AutoRemoveSettings): PolicyResolver {
-  return buildPolicyResolver(settings).resolver;
+	return buildPolicyResolver(settings).resolver;
 }

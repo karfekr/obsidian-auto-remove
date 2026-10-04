@@ -1,5 +1,5 @@
-import { joinPath, segments } from "./vault-path";
 import type { ExpiredFile } from "./types";
+import { joinPath, segments } from "./vault-path";
 
 /**
  * Builds the folder hierarchy shown in the preview dialog.
@@ -11,17 +11,17 @@ import type { ExpiredFile } from "./types";
  */
 
 export interface FileNode {
-  readonly kind: "file";
-  readonly name: string;
-  readonly path: string;
-  readonly item: ExpiredFile;
+	readonly kind: "file";
+	readonly name: string;
+	readonly path: string;
+	readonly item: ExpiredFile;
 }
 
 export interface FolderNode {
-  readonly kind: "folder";
-  readonly name: string;
-  readonly path: string;
-  readonly children: TreeNode[];
+	readonly kind: "folder";
+	readonly name: string;
+	readonly path: string;
+	readonly children: TreeNode[];
 }
 
 export type TreeNode = FolderNode | FileNode;
@@ -34,27 +34,27 @@ export type TreeNode = FolderNode | FileNode;
  * one users stop reading.
  */
 export function buildTree(items: readonly ExpiredFile[]): FolderNode {
-  const root = createFolder("", "");
+	const root = createFolder("", "");
 
-  for (const item of items) {
-    const parts = segments(item.file.path);
-    const fileName = parts.pop();
-    if (fileName === undefined) continue;
+	for (const item of items) {
+		const parts = segments(item.file.path);
+		const fileName = parts.pop();
+		if (fileName === undefined) continue;
 
-    let current = root;
-    for (const part of parts) {
-      current = findOrCreateFolder(current, part);
-    }
-    current.children.push({
-      kind: "file",
-      name: fileName,
-      path: item.file.path,
-      item,
-    });
-  }
+		let current = root;
+		for (const part of parts) {
+			current = findOrCreateFolder(current, part);
+		}
+		current.children.push({
+			kind: "file",
+			name: fileName,
+			path: item.file.path,
+			item,
+		});
+	}
 
-  sortRecursively(root);
-  return root;
+	sortRecursively(root);
+	return root;
 }
 
 /**
@@ -66,65 +66,65 @@ export function buildTree(items: readonly ExpiredFile[]): FolderNode {
  * anyone sees, so folding it into its only child would drop a level.
  */
 export function collapseSingleChildFolders(root: FolderNode): FolderNode {
-  return {
-    kind: "folder",
-    name: root.name,
-    path: root.path,
-    children: root.children.map(collapseNode),
-  };
+	return {
+		kind: "folder",
+		name: root.name,
+		path: root.path,
+		children: root.children.map(collapseNode),
+	};
 }
 
 function collapseNode(node: TreeNode): TreeNode {
-  if (node.kind === "file") return node;
+	if (node.kind === "file") return node;
 
-  const children = node.children.map(collapseNode);
-  const onlyChild = children.length === 1 ? children[0] : undefined;
+	const children = node.children.map(collapseNode);
+	const onlyChild = children.length === 1 ? children[0] : undefined;
 
-  if (onlyChild !== undefined && onlyChild.kind === "folder") {
-    return {
-      kind: "folder",
-      name: joinPath(node.name, onlyChild.name),
-      path: onlyChild.path,
-      children: onlyChild.children,
-    };
-  }
+	if (onlyChild !== undefined && onlyChild.kind === "folder") {
+		return {
+			kind: "folder",
+			name: joinPath(node.name, onlyChild.name),
+			path: onlyChild.path,
+			children: onlyChild.children,
+		};
+	}
 
-  return { kind: "folder", name: node.name, path: node.path, children };
+	return { kind: "folder", name: node.name, path: node.path, children };
 }
 
 /** Every file path beneath a node, used to cascade checkbox selection. */
 export function collectFilePaths(node: TreeNode, into: string[] = []): string[] {
-  if (node.kind === "file") {
-    into.push(node.path);
-    return into;
-  }
-  for (const child of node.children) collectFilePaths(child, into);
-  return into;
+	if (node.kind === "file") {
+		into.push(node.path);
+		return into;
+	}
+	for (const child of node.children) collectFilePaths(child, into);
+	return into;
 }
 
 function createFolder(name: string, path: string): FolderNode {
-  return { kind: "folder", name, path, children: [] };
+	return { kind: "folder", name, path, children: [] };
 }
 
 function findOrCreateFolder(parent: FolderNode, name: string): FolderNode {
-  const existing = parent.children.find(
-    (child): child is FolderNode => child.kind === "folder" && child.name === name,
-  );
-  if (existing !== undefined) return existing;
+	const existing = parent.children.find(
+		(child): child is FolderNode => child.kind === "folder" && child.name === name,
+	);
+	if (existing !== undefined) return existing;
 
-  const created = createFolder(name, joinPath(parent.path, name));
-  parent.children.push(created);
-  return created;
+	const created = createFolder(name, joinPath(parent.path, name));
+	parent.children.push(created);
+	return created;
 }
 
 function sortRecursively(node: FolderNode): void {
-  node.children.sort(compareNodes);
-  for (const child of node.children) {
-    if (child.kind === "folder") sortRecursively(child);
-  }
+	node.children.sort(compareNodes);
+	for (const child of node.children) {
+		if (child.kind === "folder") sortRecursively(child);
+	}
 }
 
 function compareNodes(a: TreeNode, b: TreeNode): number {
-  if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
-  return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+	if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
+	return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
 }

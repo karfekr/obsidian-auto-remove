@@ -23,25 +23,25 @@ import type { CleanupTrigger } from "./trigger";
  *   few bytes, not the service graph.
  */
 export class StartupTrigger implements CleanupTrigger {
-  readonly id = "startup";
+	readonly id = "startup";
 
-  private fired = false;
-  private cancelled = false;
+	private fired = false;
+	private cancelled = false;
 
-  constructor(
-    private readonly workspace: Workspace,
-    private readonly run: () => void,
-  ) {}
+	constructor(
+		private readonly workspace: Workspace,
+		private readonly run: () => void,
+	) {}
 
-  start(): () => void {
-    this.workspace.onLayoutReady(() => {
-      if (this.fired || this.cancelled) return;
-      this.fired = true;
-      this.run();
-    });
+	start(): () => void {
+		this.workspace.onLayoutReady(() => {
+			if (this.fired || this.cancelled) return;
+			this.fired = true;
+			this.run();
+		});
 
-    return () => {
-      this.cancelled = true;
-    };
-  }
+		return () => {
+			this.cancelled = true;
+		};
+	}
 }

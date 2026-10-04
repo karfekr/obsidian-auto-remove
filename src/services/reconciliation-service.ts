@@ -26,35 +26,40 @@ export const EVENT_DEBOUNCE_MS = 2_000;
 
 /** Why a reconciliation was started. Logged; never changes the outcome. */
 export type ReconcileReason =
-  "startup" | "interval" | "vault-event" | "manual" | "dry-run" | "settings-change";
+	| "startup"
+	| "interval"
+	| "vault-event"
+	| "manual"
+	| "dry-run"
+	| "settings-change";
 
 export interface ReconciliationServiceOptions {
-  readonly cleanup: CleanupService;
-  readonly scheduler: Scheduler;
-  readonly logger: Logger;
-  readonly intervalMs?: number;
-  readonly debounceMs?: number;
+	readonly cleanup: CleanupService;
+	readonly scheduler: Scheduler;
+	readonly logger: Logger;
+	readonly intervalMs?: number;
+	readonly debounceMs?: number;
 }
 
 export interface Reconciliation {
-  /** Starts the interval. Reconciliation does not wait for it to happen first. */
-  start(): void;
-  /** Cancels the interval and any pending debounce. Idempotent. */
-  stop(): void;
-  /**
-   * Reconciles now, bypassing the debounce.
-   *
-   * Used by the interval itself and by the on-demand commands, which must feel
-   * immediate rather than "in a couple of seconds".
-   */
-  run(reason: ReconcileReason, mode?: RunMode): Promise<CleanupOutcome>;
-  /**
-   * Requests a reconciliation, coalesced with any other request inside the
-   * debounce window.
-   *
-   * This is what vault events call.
-   */
-  schedule(reason: ReconcileReason): void;
+	/** Starts the interval. Reconciliation does not wait for it to happen first. */
+	start(): void;
+	/** Cancels the interval and any pending debounce. Idempotent. */
+	stop(): void;
+	/**
+	 * Reconciles now, bypassing the debounce.
+	 *
+	 * Used by the interval itself and by the on-demand commands, which must feel
+	 * immediate rather than "in a couple of seconds".
+	 */
+	run(reason: ReconcileReason, mode?: RunMode): Promise<CleanupOutcome>;
+	/**
+	 * Requests a reconciliation, coalesced with any other request inside the
+	 * debounce window.
+	 *
+	 * This is what vault events call.
+	 */
+	schedule(reason: ReconcileReason): void;
 }
 
 /**
@@ -90,85 +95,85 @@ export interface Reconciliation {
  * the same file.
  */
 export class ReconciliationService implements Reconciliation {
-  private running = false;
-  private rerun: ReconcileReason | null = null;
-  private cancelInterval: (() => void) | null = null;
-  private cancelDebounce: (() => void) | null = null;
-  private stopped = true;
+	private running = false;
+	private rerun: ReconcileReason | null = null;
+	private cancelInterval: (() => void) | null = null;
+	private cancelDebounce: (() => void) | null = null;
+	private stopped = true;
 
-  constructor(private readonly options: ReconciliationServiceOptions) {}
+	constructor(private readonly options: ReconciliationServiceOptions) {}
 
-  get isRunning(): boolean {
-    return this.running;
-  }
+	get isRunning(): boolean {
+		return this.running;
+	}
 
-  /** Whether the periodic interval is currently armed. For tests and diagnostics. */
-  get isScheduled(): boolean {
-    return this.cancelInterval !== null;
-  }
+	/** Whether the periodic interval is currently armed. For tests and diagnostics. */
+	get isScheduled(): boolean {
+		return this.cancelInterval !== null;
+	}
 
-  start(): void {
-    if (!this.stopped) return;
-    this.stopped = false;
-    this.cancelInterval = this.options.scheduler.every(
-      this.options.intervalMs ?? RECONCILIATION_INTERVAL_MS,
-      () => void this.run("interval"),
-    );
-    this.options.logger.debug("Reconciliation interval started", {
-      intervalMs: this.options.intervalMs ?? RECONCILIATION_INTERVAL_MS,
-    });
-  }
+	start(): void {
+		if (!this.stopped) return;
+		this.stopped = false;
+		this.cancelInterval = this.options.scheduler.every(
+			this.options.intervalMs ?? RECONCILIATION_INTERVAL_MS,
+			() => void this.run("interval"),
+		);
+		this.options.logger.debug("Reconciliation interval started", {
+			intervalMs: this.options.intervalMs ?? RECONCILIATION_INTERVAL_MS,
+		});
+	}
 
-  stop(): void {
-    this.stopped = true;
-    this.cancelInterval?.();
-    this.cancelInterval = null;
-    this.cancelDebounce?.();
-    this.cancelDebounce = null;
-  }
+	stop(): void {
+		this.stopped = true;
+		this.cancelInterval?.();
+		this.cancelInterval = null;
+		this.cancelDebounce?.();
+		this.cancelDebounce = null;
+	}
 
-  async run(reason: ReconcileReason, mode: RunMode = "automatic"): Promise<CleanupOutcome> {
-    if (this.running) {
-      // Repeat once the current run finishes rather than queueing an unbounded
-      // backlog of identical requests.
-      this.rerun = reason;
-      return { status: "already-running" };
-    }
+	async run(reason: ReconcileReason, mode: RunMode = "automatic"): Promise<CleanupOutcome> {
+		if (this.running) {
+			// Repeat once the current run finishes rather than queueing an unbounded
+			// backlog of identical requests.
+			this.rerun = reason;
+			return { status: "already-running" };
+		}
 
-    this.running = true;
-    try {
-      const outcome = await this.options.cleanup.run(mode);
-      this.options.logger.debug(`Reconciliation finished (${reason})`, {
-        reason,
-        status: outcome.status,
-      });
-      return outcome;
-    } catch (error) {
-      // A failure here is a bug in this plugin, not a problem with a user's file,
-      // so it must not escape as an unhandled rejection from a timer callback.
-      this.options.logger.error("Reconciliation failed", {
-        reason,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    } finally {
-      this.running = false;
-      const again = this.rerun;
-      this.rerun = null;
-      if (again !== null && !this.stopped) void this.run(again);
-    }
-  }
+		this.running = true;
+		try {
+			const outcome = await this.options.cleanup.run(mode);
+			this.options.logger.debug(`Reconciliation finished (${reason})`, {
+				reason,
+				status: outcome.status,
+			});
+			return outcome;
+		} catch (error) {
+			// A failure here is a bug in this plugin, not a problem with a user's file,
+			// so it must not escape as an unhandled rejection from a timer callback.
+			this.options.logger.error("Reconciliation failed", {
+				reason,
+				error: error instanceof Error ? error.message : String(error),
+			});
+			throw error;
+		} finally {
+			this.running = false;
+			const again = this.rerun;
+			this.rerun = null;
+			if (again !== null && !this.stopped) void this.run(again);
+		}
+	}
 
-  schedule(reason: ReconcileReason): void {
-    if (this.stopped) return;
+	schedule(reason: ReconcileReason): void {
+		if (this.stopped) return;
 
-    this.cancelDebounce?.();
-    this.cancelDebounce = this.options.scheduler.after(
-      this.options.debounceMs ?? EVENT_DEBOUNCE_MS,
-      () => {
-        this.cancelDebounce = null;
-        void this.run(reason);
-      },
-    );
-  }
+		this.cancelDebounce?.();
+		this.cancelDebounce = this.options.scheduler.after(
+			this.options.debounceMs ?? EVENT_DEBOUNCE_MS,
+			() => {
+				this.cancelDebounce = null;
+				void this.run(reason);
+			},
+		);
+	}
 }

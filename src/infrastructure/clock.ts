@@ -25,39 +25,39 @@ export const systemClock: Clock = () => Date.now();
 
 /** A clock a test drives by hand. */
 export class ManualClock {
-  private current: number;
+	private current: number;
 
-  constructor(initial: number | string | Date = 0) {
-    this.current = toMillis(initial);
-  }
+	constructor(initial: number | string | Date = 0) {
+		this.current = toMillis(initial);
+	}
 
-  /**
-   * A clock function reading this clock.
-   *
-   * A bound property rather than a method so it satisfies {@link Clock} directly:
-   * `new ExpirationScanner(vault, clock.now)` reads well and needs no lambda.
-   */
-  readonly now: Clock = () => this.current;
+	/**
+	 * A clock function reading this clock.
+	 *
+	 * A bound property rather than a method so it satisfies {@link Clock} directly:
+	 * `new ExpirationScanner(vault, clock.now)` reads well and needs no lambda.
+	 */
+	readonly now: Clock = () => this.current;
 
-  /** Jumps to an absolute instant. */
-  set(value: number | string | Date): void {
-    this.current = toMillis(value);
-  }
+	/** Jumps to an absolute instant. */
+	set(value: number | string | Date): void {
+		this.current = toMillis(value);
+	}
 
-  /** Moves forward by a duration in milliseconds. Negative values move backwards. */
-  advanceMs(ms: number): void {
-    this.current += ms;
-  }
+	/** Moves forward by a duration in milliseconds. Negative values move backwards. */
+	advanceMs(ms: number): void {
+		this.current += ms;
+	}
 
-  /** Moves forward by a number of days — the unit the rules are written in. */
-  advanceDays(days: number): void {
-    this.advanceMs(days * 86_400_000);
-  }
+	/** Moves forward by a number of days — the unit the rules are written in. */
+	advanceDays(days: number): void {
+		this.advanceMs(days * 86_400_000);
+	}
 }
 
 function toMillis(value: number | string | Date): number {
-  if (value instanceof Date) return value.getTime();
-  if (typeof value === "number") return value;
-  const parsed = Date.parse(value);
-  return Number.isNaN(parsed) ? 0 : parsed;
+	if (value instanceof Date) return value.getTime();
+	if (typeof value === "number") return value;
+	const parsed = Date.parse(value);
+	return Number.isNaN(parsed) ? 0 : parsed;
 }

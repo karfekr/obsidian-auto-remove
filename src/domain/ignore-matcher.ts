@@ -12,26 +12,26 @@ import ignore from "ignore";
  * them — mirroring how a `.gitignore` behaves in the directory it lives in.
  */
 export interface IgnoreMatcher {
-  /** Whether the given folder-relative path is excluded. */
-  ignores(relativePath: string): boolean;
+	/** Whether the given folder-relative path is excluded. */
+	ignores(relativePath: string): boolean;
 }
 
 /** A matcher that excludes nothing, used when a rule has no patterns. */
 const MATCH_NOTHING: IgnoreMatcher = { ignores: () => false };
 
 export function createIgnoreMatcher(patterns: readonly string[]): IgnoreMatcher {
-  const usable = patterns.map((pattern) => pattern.trim()).filter(isMeaningfulPattern);
-  if (usable.length === 0) return MATCH_NOTHING;
+	const usable = patterns.map((pattern) => pattern.trim()).filter(isMeaningfulPattern);
+	if (usable.length === 0) return MATCH_NOTHING;
 
-  const instance = ignore().add(usable);
-  return {
-    ignores(relativePath) {
-      // `ignore` rejects absolute paths and the empty string outright, and a
-      // malformed user pattern should never take a cleanup run down with it.
-      if (relativePath.length === 0 || relativePath.startsWith("/")) return false;
-      return instance.ignores(relativePath);
-    },
-  };
+	const instance = ignore().add(usable);
+	return {
+		ignores(relativePath) {
+			// `ignore` rejects absolute paths and the empty string outright, and a
+			// malformed user pattern should never take a cleanup run down with it.
+			if (relativePath.length === 0 || relativePath.startsWith("/")) return false;
+			return instance.ignores(relativePath);
+		},
+	};
 }
 
 /**
@@ -39,8 +39,8 @@ export function createIgnoreMatcher(patterns: readonly string[]): IgnoreMatcher 
  * gitignore syntax, and users naturally write both in a multi-line text box.
  */
 export function isMeaningfulPattern(pattern: string): boolean {
-  const trimmed = pattern.trim();
-  return trimmed.length > 0 && !trimmed.startsWith("#");
+	const trimmed = pattern.trim();
+	return trimmed.length > 0 && !trimmed.startsWith("#");
 }
 
 /**
@@ -51,11 +51,11 @@ export function isMeaningfulPattern(pattern: string): boolean {
  * as it would in a `.gitignore`; only genuinely unparseable patterns fail.
  */
 export function validateIgnorePattern(pattern: string): string | null {
-  if (!isMeaningfulPattern(pattern)) return null;
-  try {
-    ignore().add(pattern.trim());
-    return null;
-  } catch {
-    return "This is not a valid ignore pattern.";
-  }
+	if (!isMeaningfulPattern(pattern)) return null;
+	try {
+		ignore().add(pattern.trim());
+		return null;
+	} catch {
+		return "This is not a valid ignore pattern.";
+	}
 }

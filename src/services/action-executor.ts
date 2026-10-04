@@ -1,13 +1,13 @@
 import type { ExpiredFile } from "../domain/types";
-import { executeAction } from "./pending-actions";
 import type { PendingActions } from "./pending-actions";
+import { executeAction } from "./pending-actions";
 import type {
-  ActionFailure,
-  ActionWarning,
-  CleanupResult,
-  FileActions,
-  Logger,
-  OpenFileTracker,
+	ActionFailure,
+	ActionWarning,
+	CleanupResult,
+	FileActions,
+	Logger,
+	OpenFileTracker,
 } from "./ports";
 
 /**
@@ -27,68 +27,68 @@ import type {
  * - **failed** — the file did not move or was not trashed.
  */
 export class ActionExecutor {
-  constructor(
-    private readonly actions: FileActions,
-    private readonly openFiles: OpenFileTracker,
-    private readonly pending: PendingActions,
-    private readonly logger: Logger,
-  ) {}
+	constructor(
+		private readonly actions: FileActions,
+		private readonly openFiles: OpenFileTracker,
+		private readonly pending: PendingActions,
+		private readonly logger: Logger,
+	) {}
 
-  async execute(items: readonly ExpiredFile[]): Promise<CleanupResult> {
-    const removed: ExpiredFile[] = [];
-    const deferred: ExpiredFile[] = [];
-    const warnings: ActionWarning[] = [];
-    const failed: ActionFailure[] = [];
+	async execute(items: readonly ExpiredFile[]): Promise<CleanupResult> {
+		const removed: ExpiredFile[] = [];
+		const deferred: ExpiredFile[] = [];
+		const warnings: ActionWarning[] = [];
+		const failed: ActionFailure[] = [];
 
-    // Read the open set once: opening a tab midway through a run should not
-    // change how the remaining files in that run are treated.
-    const openPaths = this.openFiles.getOpenPaths();
+		// Read the open set once: opening a tab midway through a run should not
+		// change how the remaining files in that run are treated.
+		const openPaths = this.openFiles.getOpenPaths();
 
-    for (const item of items) {
-      if (openPaths.has(item.file.path)) {
-        this.pending.defer(item);
-        deferred.push(item);
-        this.logger.debug(`Deferred ${item.file.path}: open in an editor`, {
-          path: item.file.path,
-        });
-        continue;
-      }
+		for (const item of items) {
+			if (openPaths.has(item.file.path)) {
+				this.pending.defer(item);
+				deferred.push(item);
+				this.logger.debug(`Deferred ${item.file.path}: open in an editor`, {
+					path: item.file.path,
+				});
+				continue;
+			}
 
-      try {
-        const result = await executeAction(this.actions, item);
+			try {
+				const result = await executeAction(this.actions, item);
 
-        if (!result.moved) {
-          failed.push({
-            item,
-            error: new Error(result.warnings[0] ?? "The action did not complete."),
-          });
-          this.logger.error(`Could not remove "${item.file.path}"`, { path: item.file.path });
-          continue;
-        }
+				if (!result.moved) {
+					failed.push({
+						item,
+						error: new Error(result.warnings[0] ?? "The action did not complete."),
+					});
+					this.logger.error(`Could not remove "${item.file.path}"`, { path: item.file.path });
+					continue;
+				}
 
-        removed.push(item);
+				removed.push(item);
 
-        // A move that succeeded with a caveat is still a move. Rolling it back
-        // would be a second, riskier mutation, and re-running would move the file
-        // again — so it is surfaced, not retried.
-        for (const message of result.warnings) {
-          warnings.push({ item, message });
-          this.logger.warn(`Moved "${item.file.path}" but ${message}`, { path: item.file.path });
-        }
-      } catch (error) {
-        // One bad file must not abandon the rest.
-        failed.push({ item, error });
-        this.logger.error(`Could not remove "${item.file.path}"`, {
-          path: item.file.path,
-          error: describeError(error),
-        });
-      }
-    }
+				// A move that succeeded with a caveat is still a move. Rolling it back
+				// would be a second, riskier mutation, and re-running would move the file
+				// again — so it is surfaced, not retried.
+				for (const message of result.warnings) {
+					warnings.push({ item, message });
+					this.logger.warn(`Moved "${item.file.path}" but ${message}`, { path: item.file.path });
+				}
+			} catch (error) {
+				// One bad file must not abandon the rest.
+				failed.push({ item, error });
+				this.logger.error(`Could not remove "${item.file.path}"`, {
+					path: item.file.path,
+					error: describeError(error),
+				});
+			}
+		}
 
-    return { removed, deferred, warnings, failed };
-  }
+		return { removed, deferred, warnings, failed };
+	}
 }
 
 function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+	return error instanceof Error ? error.message : String(error);
 }

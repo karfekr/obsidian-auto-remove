@@ -60,7 +60,7 @@ jobs:
         run: pnpm test
 
       - name: Lint
-        run: pnpm exec eslint .
+        run: pnpm exec biome ci .
 
       - name: Validate plugin manifest
         run: |

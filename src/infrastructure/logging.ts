@@ -1,4 +1,4 @@
-import type { Logger, LogContext } from "../services/ports";
+import type { LogContext, Logger } from "../services/ports";
 
 /**
  * Diagnostics that make a background plugin explainable.
@@ -21,18 +21,18 @@ import type { Logger, LogContext } from "../services/ports";
 const PREFIX = "Auto Remove";
 
 export class ConsoleLogger implements Logger {
-  constructor(private debugEnabled: () => boolean) {}
+	constructor(private debugEnabled: () => boolean) {}
 
-  debug(message: string, context?: LogContext): void {
-    if (!this.debugEnabled()) return;
-    console.info(`${PREFIX}: ${message}`, context ?? "");
-  }
+	debug(message: string, context?: LogContext): void {
+		if (!this.debugEnabled()) return;
+		console.info(`${PREFIX}: ${message}`, context ?? "");
+	}
 
-  warn(message: string, context?: LogContext): void {
-    console.warn(`${PREFIX}: ${message}`, context ?? "");
-  }
+	warn(message: string, context?: LogContext): void {
+		console.warn(`${PREFIX}: ${message}`, context ?? "");
+	}
 
-  error(message: string, context?: LogContext): void {
-    console.error(`${PREFIX}: ${message}`, context ?? "");
-  }
+	error(message: string, context?: LogContext): void {
+		console.error(`${PREFIX}: ${message}`, context ?? "");
+	}
 }

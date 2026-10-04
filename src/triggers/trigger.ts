@@ -9,10 +9,10 @@
  * configuration, and lives with the other commands.
  */
 export interface CleanupTrigger {
-  /** A short identifier, useful in tests and diagnostics. */
-  readonly id: string;
-  /** Begins listening. Returns a function that stops it again. */
-  start(): () => void;
+	/** A short identifier, useful in tests and diagnostics. */
+	readonly id: string;
+	/** Begins listening. Returns a function that stops it again. */
+	start(): () => void;
 }
 
 /** Asks for a reconciliation. Supplied to triggers so they never build one. */

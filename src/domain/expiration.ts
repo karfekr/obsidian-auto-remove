@@ -1,5 +1,5 @@
-import { MAX_TTL_DAYS, MILLISECONDS_PER_DAY } from "./types";
 import type { ExpirationPolicy, ExpiredFile, FileSnapshot } from "./types";
+import { MAX_TTL_DAYS, MILLISECONDS_PER_DAY } from "./types";
 
 /**
  * The whole of the TTL arithmetic.
@@ -11,7 +11,7 @@ import type { ExpirationPolicy, ExpiredFile, FileSnapshot } from "./types";
 
 /** The instant at which a file last modified at `mtime` becomes eligible. */
 export function expiresAt(mtime: number, ttlDays: number): number {
-  return mtime + ttlDays * MILLISECONDS_PER_DAY;
+	return mtime + ttlDays * MILLISECONDS_PER_DAY;
 }
 
 /**
@@ -21,21 +21,21 @@ export function expiresAt(mtime: number, ttlDays: number): number {
  * scanned — a deliberate way to say "clear this out on the next run".
  */
 export function isExpired(file: FileSnapshot, policy: ExpirationPolicy, now: number): boolean {
-  return now >= expiresAt(file.mtime, policy.ttlDays);
+	return now >= expiresAt(file.mtime, policy.ttlDays);
 }
 
 /** Pairs a file with the policy that claimed it, once expiry is established. */
 export function toExpiredFile(
-  file: FileSnapshot,
-  policy: ExpirationPolicy,
-  now: number,
+	file: FileSnapshot,
+	policy: ExpirationPolicy,
+	now: number,
 ): ExpiredFile {
-  return {
-    file,
-    policy,
-    expiredAt: expiresAt(file.mtime, policy.ttlDays),
-    ageMs: now - file.mtime,
-  };
+	return {
+		file,
+		policy,
+		expiredAt: expiresAt(file.mtime, policy.ttlDays),
+		ageMs: now - file.mtime,
+	};
 }
 
 /**
@@ -48,16 +48,16 @@ export function toExpiredFile(
  * so distant that the note silently never expires at all.
  */
 export function parseTtlDays(value: unknown): number | null {
-  const parsed = coerceToNumber(value);
-  if (!Number.isInteger(parsed)) return null;
-  if (parsed < 0 || parsed > MAX_TTL_DAYS) return null;
-  return parsed;
+	const parsed = coerceToNumber(value);
+	if (!Number.isInteger(parsed)) return null;
+	if (parsed < 0 || parsed > MAX_TTL_DAYS) return null;
+	return parsed;
 }
 
 function coerceToNumber(value: unknown): number {
-  if (typeof value === "number") return value;
-  if (typeof value !== "string") return NaN;
-  const trimmed = value.trim();
-  // `Number('')` is 0, which would silently mean "expire immediately".
-  return trimmed.length === 0 ? NaN : Number(trimmed);
+	if (typeof value === "number") return value;
+	if (typeof value !== "string") return NaN;
+	const trimmed = value.trim();
+	// `Number('')` is 0, which would silently mean "expire immediately".
+	return trimmed.length === 0 ? NaN : Number(trimmed);
 }

@@ -20,9 +20,8 @@ Five layers, each depending only inward:
 ```
 
 `src/domain`, `src/services`, `src/settings` and `src/infrastructure` contain no reference to the
-Obsidian API at all. That is enforced three ways: a `no-restricted-imports` rule in
-`eslint.config.mjs`, `tests/architecture.test.ts`, which reads the source files and fails if an
-import slips through, and the fact that the test suite runs without a DOM.
+Obsidian API at all. That is enforced two ways: `tests/architecture.test.ts`, which reads the source
+files and fails if an import slips through, and the fact that the test suite runs without a DOM.
 
 ### Why
 
@@ -304,6 +303,15 @@ is byte-identical with or without the suite present.
 Test support lives in `tests/support/`: `obsidian-mock.ts` (the `obsidian` module itself),
 `test-doubles.ts` (`FakeVault`, `FakeOpenFiles`, `ManualScheduler`) and `loggers.ts` (`NullLogger`,
 `RecordingLogger`). None of it has a production caller, so none of it ships.
+
+The `obsidian` package is types-only — it ships `obsidian.d.ts` and declares `"main": ""`, because
+Obsidian supplies the runtime at app start. A bare `import ... from "obsidian"` therefore has no
+resolvable entry, and a Vite resolver walking the module graph fails on it. `vitest.config.ts` fixes
+that with a single `resolve.alias` from `^obsidian$` to the mock, rather than relying on a per-file
+`vi.mock` to be applied before the resolver runs: that ordering is a Vitest/Vite implementation
+detail, and depending on it broke on a clean install. Only execution is redirected — `tsconfig.json`
+has no path mapping, so TypeScript still checks every `obsidian` import against the real
+`obsidian.d.ts`, and `esbuild.config.mjs` still marks `obsidian` as `external`.
 
 `tests/support/obsidian-mock.ts` stands in for the `obsidian` module. It is hand-written rather than
 generated, and it models the awkward semantics on purpose: the Vault API returning `null` inside

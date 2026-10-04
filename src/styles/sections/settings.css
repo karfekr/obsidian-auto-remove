@@ -1,31 +1,31 @@
 .auto-remove-rule {
-  margin-bottom: var(--size-4-4);
-  padding: 0 var(--size-4-3);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  background-color: var(--background-primary-alt);
+	margin-bottom: var(--size-4-4);
+	padding: 0 var(--size-4-3);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background-color: var(--background-primary-alt);
 }
 
 .auto-remove-rule .setting-item:last-child {
-  border-bottom: none;
+	border-bottom: none;
 }
 
 .auto-remove-rule__patterns textarea {
-  width: 100%;
-  min-width: 15rem;
-  font-family: var(--font-monospace);
-  resize: vertical;
+	width: 100%;
+	min-width: 15rem;
+	font-family: var(--font-monospace);
+	resize: vertical;
 }
 
 .auto-remove-rule__error {
-  display: none;
-  padding: var(--size-2-2) 0;
-  color: var(--text-error);
-  font-size: var(--font-ui-smaller);
+	display: none;
+	padding: var(--size-2-2) 0;
+	color: var(--text-error);
+	font-size: var(--font-ui-smaller);
 }
 
 .auto-remove-rule__error.is-visible {
-  display: block;
+	display: block;
 }
 
 /*
@@ -36,30 +36,30 @@
  * doing nothing — is the thing a user needs to be certain about.
  */
 .auto-remove-banner {
-  display: none;
-  margin-bottom: var(--size-4-4);
-  padding: var(--size-4-3);
-  border: 1px solid var(--text-error);
-  border-radius: var(--radius-m);
-  background-color: var(--background-modifier-error);
-  color: var(--text-normal);
-  font-size: var(--font-ui-small);
+	display: none;
+	margin-bottom: var(--size-4-4);
+	padding: var(--size-4-3);
+	border: 1px solid var(--text-error);
+	border-radius: var(--radius-m);
+	background-color: var(--background-modifier-error);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
 }
 
 .auto-remove-banner.is-visible {
-  display: block;
+	display: block;
 }
 
 .auto-remove-banner p {
-  margin: 0 0 var(--size-2-2);
+	margin: 0 0 var(--size-2-2);
 }
 
 .auto-remove-banner p:last-child {
-  margin-bottom: 0;
-  color: var(--text-muted);
+	margin-bottom: 0;
+	color: var(--text-muted);
 }
 
 .auto-remove-banner ul {
-  margin: 0 0 var(--size-2-2);
-  padding-inline-start: var(--size-4-4);
+	margin: 0 0 var(--size-2-2);
+	padding-inline-start: var(--size-4-4);
 }

@@ -1,19 +1,19 @@
 .auto-remove-modal {
-  --auto-remove-indent: 1.35em;
-  --auto-remove-guide: var(--background-modifier-border);
-  max-width: min(44rem, 90vw);
+	--auto-remove-indent: 1.35em;
+	--auto-remove-guide: var(--background-modifier-border);
+	max-width: min(44rem, 90vw);
 }
 
 .auto-remove-modal__intro p {
-  margin: 0 0 var(--size-2-2);
+	margin: 0 0 var(--size-2-2);
 }
 
 .auto-remove-modal__summary {
-  color: var(--text-muted);
-  font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
 }
 
 .auto-remove-modal__bulk {
-  border-top: none;
-  padding-top: 0;
+	border-top: none;
+	padding-top: 0;
 }

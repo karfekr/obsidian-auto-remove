@@ -35,66 +35,67 @@ export const MAX_TTL_DAYS = 36_500;
  * type at the boundary; see {@link ../settings/settings-store}.
  */
 export type RemovalAction =
-  { readonly kind: "trash" } | { readonly kind: "move"; readonly destination: string };
+	| { readonly kind: "trash" }
+	| { readonly kind: "move"; readonly destination: string };
 
 export type RemovalActionKind = RemovalAction["kind"];
 
 /** An immutable view of a vault file, sufficient to decide its fate. */
 export interface FileSnapshot {
-  /** Vault-relative path, e.g. `Inbox/ideas/note.md`. */
-  readonly path: string;
-  /** Lower-case extension without the dot, e.g. `md`. */
-  readonly extension: string;
-  /** Last modification time as a Unix timestamp in milliseconds. */
-  readonly mtime: number;
-  /** Parsed frontmatter, or `null` for files that cannot carry any. */
-  readonly frontmatter: Readonly<Record<string, unknown>> | null;
+	/** Vault-relative path, e.g. `Inbox/ideas/note.md`. */
+	readonly path: string;
+	/** Lower-case extension without the dot, e.g. `md`. */
+	readonly extension: string;
+	/** Last modification time as a Unix timestamp in milliseconds. */
+	readonly mtime: number;
+	/** Parsed frontmatter, or `null` for files that cannot carry any. */
+	readonly frontmatter: Readonly<Record<string, unknown>> | null;
 }
 
 /** Explains which rule claimed a file, so the preview can show its provenance. */
 export type PolicyOrigin =
-  | { readonly source: "frontmatter" }
-  | { readonly source: "folder-rule"; readonly ruleId: string; readonly folder: string };
+	| { readonly source: "frontmatter" }
+	| { readonly source: "folder-rule"; readonly ruleId: string; readonly folder: string };
 
 /** The decision a {@link PolicySource} reached about a file. */
 export interface ExpirationPolicy {
-  readonly ttlDays: number;
-  readonly action: RemovalAction;
-  readonly origin: PolicyOrigin;
+	readonly ttlDays: number;
+	readonly action: RemovalAction;
+	readonly origin: PolicyOrigin;
 }
 
 /** A file that has outlived its TTL, paired with the policy that claimed it. */
 export interface ExpiredFile {
-  readonly file: FileSnapshot;
-  readonly policy: ExpirationPolicy;
-  /** When the file became eligible for removal. */
-  readonly expiredAt: number;
-  /** How long ago the file was last modified, at scan time. */
-  readonly ageMs: number;
+	readonly file: FileSnapshot;
+	readonly policy: ExpirationPolicy;
+	/** When the file became eligible for removal. */
+	readonly expiredAt: number;
+	/** How long ago the file was last modified, at scan time. */
+	readonly ageMs: number;
 }
 
 /** A user-defined rule that applies a TTL to everything under a folder. */
 export interface FolderRule {
-  /** Stable identity, so the settings UI can edit a list without index churn. */
-  readonly id: string;
-  readonly enabled: boolean;
-  /** Vault-relative folder path. An empty string means the vault root. */
-  readonly folder: string;
-  readonly ttlDays: number;
-  readonly action: RemovalActionKind;
-  /** Only meaningful when {@link action} is `move`. */
-  readonly moveDestination: string;
-  /**
-   * Which files this rule may claim.
-   *
-   * `md` is the default and the safe choice: only Markdown files carry the
-   * frontmatter the plugin strips after a move, so including attachments makes
-   * a destination that is itself covered by a rule re-file them indefinitely.
-   * `all` opts attachments in explicitly, and the user accepts that risk.
-   */
-  readonly scope: FileScope;
-  /** Gitignore-style patterns, resolved relative to {@link folder}. */
-  readonly ignorePatterns: readonly string[];
+	/** Stable identity, so the settings UI can edit a list without index churn. */
+	readonly id: string;
+	readonly enabled: boolean;
+	/** Vault-relative folder path. An empty string means the vault root. */
+	readonly folder: string;
+	readonly ttlDays: number;
+	readonly action: RemovalActionKind;
+	/** Only meaningful when {@link action} is `move`. */
+	readonly moveDestination: string;
+	/**
+	 * Which files this rule may claim.
+	 *
+	 * `md` is the default and the safe choice: only Markdown files carry the
+	 * frontmatter the plugin strips after a move, so including attachments makes
+	 * a destination that is itself covered by a rule re-file them indefinitely.
+	 * `all` opts attachments in explicitly, and the user accepts that risk.
+	 */
+	readonly scope: FileScope;
+	/** Gitignore-style patterns, resolved relative to {@link folder}. */
+	readonly ignorePatterns: readonly string[];
 }
 
 /**
@@ -107,20 +108,20 @@ export type FileScope = "md" | "all";
 
 /** The persisted plugin configuration. */
 export interface AutoRemoveSettings {
-  /** Bumped whenever the persisted shape changes, to drive migrations. */
-  readonly schemaVersion: number;
-  /** TTL applied to `auto-remove: true` notes that omit `ttl`. */
-  readonly defaultTtlDays: number;
-  /** Action applied to every frontmatter-opted file. */
-  readonly defaultAction: RemovalActionKind;
-  /** Only meaningful when {@link defaultAction} is `move`. */
-  readonly defaultMoveDestination: string;
-  readonly folderRules: readonly FolderRule[];
-  /**
-   * Emit per-decision diagnostics to the developer console.
-   *
-   * Off by default: reconciliation also runs on vault events, so debug output
-   * is only useful while actively diagnosing something.
-   */
-  readonly debugLogging: boolean;
+	/** Bumped whenever the persisted shape changes, to drive migrations. */
+	readonly schemaVersion: number;
+	/** TTL applied to `auto-remove: true` notes that omit `ttl`. */
+	readonly defaultTtlDays: number;
+	/** Action applied to every frontmatter-opted file. */
+	readonly defaultAction: RemovalActionKind;
+	/** Only meaningful when {@link defaultAction} is `move`. */
+	readonly defaultMoveDestination: string;
+	readonly folderRules: readonly FolderRule[];
+	/**
+	 * Emit per-decision diagnostics to the developer console.
+	 *
+	 * Off by default: reconciliation also runs on vault events, so debug output
+	 * is only useful while actively diagnosing something.
+	 */
+	readonly debugLogging: boolean;
 }

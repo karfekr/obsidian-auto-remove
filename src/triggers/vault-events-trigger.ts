@@ -22,29 +22,29 @@ type RelevantVaultEvent = "create" | "modify" | "rename";
  * vault loads, which is precisely why the run must not be immediate.
  */
 export class VaultEventsTrigger {
-  readonly id = "vault-events";
+	readonly id = "vault-events";
 
-  constructor(
-    private readonly vault: Vault,
-    private readonly requestReconciliation: () => void,
-    private readonly logger?: Logger,
-  ) {}
+	constructor(
+		private readonly vault: Vault,
+		private readonly requestReconciliation: () => void,
+		private readonly logger?: Logger,
+	) {}
 
-  start(): () => void {
-    const refs: EventRef[] = [
-      this.vault.on("create", () => this.notify("create")),
-      this.vault.on("modify", () => this.notify("modify")),
-      this.vault.on("rename", () => this.notify("rename")),
-    ];
+	start(): () => void {
+		const refs: EventRef[] = [
+			this.vault.on("create", () => this.notify("create")),
+			this.vault.on("modify", () => this.notify("modify")),
+			this.vault.on("rename", () => this.notify("rename")),
+		];
 
-    return () => {
-      for (const ref of refs) this.vault.offref(ref);
-      refs.length = 0;
-    };
-  }
+		return () => {
+			for (const ref of refs) this.vault.offref(ref);
+			refs.length = 0;
+		};
+	}
 
-  private notify(event: RelevantVaultEvent): void {
-    this.logger?.debug(`Vault event: ${event}`, { event });
-    this.requestReconciliation();
-  }
+	private notify(event: RelevantVaultEvent): void {
+		this.logger?.debug(`Vault event: ${event}`, { event });
+		this.requestReconciliation();
+	}
 }

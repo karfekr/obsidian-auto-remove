@@ -1,7 +1,7 @@
-import { MAX_TTL_DAYS } from "../domain/types";
 import type { AutoRemoveSettings, FolderRule } from "../domain/types";
-import { normalizeFolder } from "../domain/vault-path";
+import { MAX_TTL_DAYS } from "../domain/types";
 import { validateFolderRule } from "../domain/validation";
+import { normalizeFolder } from "../domain/vault-path";
 import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, DEFAULT_TTL_DAYS } from "./defaults";
 
 /**
@@ -19,16 +19,16 @@ import { CURRENT_SCHEMA_VERSION, DEFAULT_SETTINGS, DEFAULT_TTL_DAYS } from "./de
  * `domain/validation.ts` — it is never turned into a different action.
  */
 export function parseSettings(raw: unknown): AutoRemoveSettings {
-  const source = isRecord(raw) ? raw : {};
+	const source = isRecord(raw) ? raw : {};
 
-  return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    defaultTtlDays: parseTtl(source["defaultTtlDays"], DEFAULT_TTL_DAYS),
-    defaultAction: parseActionKind(source["defaultAction"]),
-    defaultMoveDestination: parseFolderPath(source["defaultMoveDestination"]),
-    folderRules: parseFolderRules(source["folderRules"]),
-    debugLogging: source["debugLogging"] === true,
-  };
+	return {
+		schemaVersion: CURRENT_SCHEMA_VERSION,
+		defaultTtlDays: parseTtl(source.defaultTtlDays, DEFAULT_TTL_DAYS),
+		defaultAction: parseActionKind(source.defaultAction),
+		defaultMoveDestination: parseFolderPath(source.defaultMoveDestination),
+		folderRules: parseFolderRules(source.folderRules),
+		debugLogging: source.debugLogging === true,
+	};
 }
 
 /**
@@ -38,25 +38,25 @@ export function parseSettings(raw: unknown): AutoRemoveSettings {
  * can never disagree about which rules are live.
  */
 export function describeRuleProblem(rule: FolderRule): string | null {
-  return validateFolderRule(rule)?.message ?? null;
+	return validateFolderRule(rule)?.message ?? null;
 }
 
 function parseFolderRules(raw: unknown): FolderRule[] {
-  if (!Array.isArray(raw)) return [...DEFAULT_SETTINGS.folderRules];
-  return raw.filter(isRecord).map(parseFolderRule);
+	if (!Array.isArray(raw)) return [...DEFAULT_SETTINGS.folderRules];
+	return raw.filter(isRecord).map(parseFolderRule);
 }
 
 function parseFolderRule(raw: Record<string, unknown>, index: number): FolderRule {
-  return {
-    id: typeof raw["id"] === "string" && raw["id"].length > 0 ? raw["id"] : `rule-${index}`,
-    enabled: raw["enabled"] !== false,
-    folder: parseFolderPath(raw["folder"]),
-    ttlDays: parseTtl(raw["ttlDays"], DEFAULT_TTL_DAYS),
-    action: parseActionKind(raw["action"]),
-    moveDestination: parseFolderPath(raw["moveDestination"]),
-    scope: parseScope(raw["scope"]),
-    ignorePatterns: parsePatterns(raw["ignorePatterns"]),
-  };
+	return {
+		id: typeof raw.id === "string" && raw.id.length > 0 ? raw.id : `rule-${index}`,
+		enabled: raw.enabled !== false,
+		folder: parseFolderPath(raw.folder),
+		ttlDays: parseTtl(raw.ttlDays, DEFAULT_TTL_DAYS),
+		action: parseActionKind(raw.action),
+		moveDestination: parseFolderPath(raw.moveDestination),
+		scope: parseScope(raw.scope),
+		ignorePatterns: parsePatterns(raw.ignorePatterns),
+	};
 }
 
 /**
@@ -67,38 +67,38 @@ function parseFolderRule(raw: Record<string, unknown>, index: number): FolderRul
  * what it covers" is "Markdown only".
  */
 function parseScope(raw: unknown): FolderRule["scope"] {
-  return raw === "all" ? "all" : "md";
+	return raw === "all" ? "all" : "md";
 }
 
 /** Accepts patterns as an array or as the newline-separated text the UI edits. */
 function parsePatterns(raw: unknown): string[] {
-  if (typeof raw === "string") return splitPatternLines(raw);
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((entry): entry is string => typeof entry === "string");
+	if (typeof raw === "string") return splitPatternLines(raw);
+	if (!Array.isArray(raw)) return [];
+	return raw.filter((entry): entry is string => typeof entry === "string");
 }
 
 export function splitPatternLines(text: string): string[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+	return text
+		.split("\n")
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0);
 }
 
 function parseTtl(raw: unknown, fallback: number): number {
-  const value = typeof raw === "number" ? raw : Number(raw);
-  if (!Number.isInteger(value)) return fallback;
-  if (value < 0 || value > MAX_TTL_DAYS) return fallback;
-  return value;
+	const value = typeof raw === "number" ? raw : Number(raw);
+	if (!Number.isInteger(value)) return fallback;
+	if (value < 0 || value > MAX_TTL_DAYS) return fallback;
+	return value;
 }
 
 function parseActionKind(raw: unknown): AutoRemoveSettings["defaultAction"] {
-  return raw === "move" ? "move" : "trash";
+	return raw === "move" ? "move" : "trash";
 }
 
 function parseFolderPath(raw: unknown): string {
-  return typeof raw === "string" ? normalizeFolder(raw) : "";
+	return typeof raw === "string" ? normalizeFolder(raw) : "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
